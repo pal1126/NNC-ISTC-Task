@@ -205,9 +205,11 @@ with sync_playwright() as p:
         assert page.locator('#inspectionTerm').input_value()=='Просрочен'
         page.locator('#role').select_option('edit')
         activate(page.locator('[data-act="inspectSubmit"][data-v="PKG-004"]'))
+        page.locator('#inext').fill('2026-12-20')
         page.locator('#iaction').fill('Повторная проверка')
         page.locator('#iref').fill('DEMO-TEST-CHECK')
         activate(page.locator('#entry button.primary'))
+        page.locator('#dlg').wait_for(state='hidden')
         page.locator('#inspectionTerm').select_option('На проверке')
         activate(opener)
         assert page.locator('#dlg h3').count()==2
