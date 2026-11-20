@@ -540,16 +540,29 @@ function snapshotDetails(index){const r=reports[index];if(!r?.cycle)return;
  modal('Ведомость '+esc(r.id),fact([['Учётная дата',esc(r.stock_date)],['Сформирована',dt(r.at)],['Отчитались площадки',r.coverage.reported+' из '+r.coverage.expected],['Вне состава утверждённой версии',r.excluded.map(esc).join(', ')||'Нет']])+selectedTotals(r.rows)+tbl(['Запись','Площадка','Вид сведений','Объём','Источник','Редакция'],frozenRows(r))+actions(btn('Скачать строки версии (CSV)','frozenCsv',index),btn('Скачать ведомость с пояснениями (HTML)','releaseFile',index))+comparison)
 }
 const inspectionLog=wastePackages.map(p=>({pkg:p.id,day:p.last,scope:'Наружная поверхность',finding:p.condition,action:'Сведения отсутствуют',source:p.source}));
-function inspectionDecisionCell(entry){
+function inspectionDecisionCell(entry,expanded=false){
  if(!entry.submission)return esc(entry.source);
  const x=entry.submission;
  const outcome=entry.returnReason?'Возвращено на доработку':'Подтверждено';
  const fields=[['Решение',outcome],['Время решения (UTC)',entry.decidedAt.replace('T',' ').slice(0,19)]];
  if(entry.returnReason)fields.push(['Причина возврата',esc(entry.returnReason)]);
- return esc(entry.source)+'<details class="inspection-decision"><summary>Редакция '+x.revision+' · '+outcome+'</summary>'+
+ return esc(entry.source)+'<details class="inspection-decision"'+(expanded?' open':'')+'><summary>Редакция '+x.revision+' · '+outcome+'</summary>'+
   fact(fields)+fact(inspectionReviewFields.map(([key,label])=>[label,esc(x[key])]))+inspectionCorrection(x.correction)+'</details>';
 }
-function inspectionsFor(p){return panel('Хронология осмотров '+p.id,tbl(['Дата','Область осмотра','Наблюдение','Последующие действия','Документ'],inspectionLog.filter(e=>e.pkg===p.id).sort((a,b)=>b.day.localeCompare(a.day)).map(e=>[esc(e.day),esc(e.scope),esc(e.finding),esc(e.action),inspectionDecisionCell(e)]))+actions(btn('Добавить запись в хронологию','addObservation',p.id,st.role!=='edit')))}
+function inspectionHistoryFile(p,entries){
+ const title='Хронология осмотров упаковки '+esc(p.id);
+ const articles=entries.map(e=>'<article><h2>'+esc(e.day)+' · '+esc(e.scope)+'</h2>'+
+  fact([['Наблюдение',esc(e.finding)],['Последующие действия',esc(e.action)],['Документ',inspectionDecisionCell(e,true)]])+'</article>').join('');
+ return '<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title>'+
+  '<style>body{max-width:55rem;margin:auto;padding:1rem;font:1rem/1.5 system-ui,sans-serif;color:#16324a;overflow-wrap:anywhere}article{border-top:1px solid #a4b9c7;margin-top:1rem}dt{font-weight:600}dd{margin:0 0 .6rem}summary{font-weight:650}h2,h3,h4{break-after:avoid}</style>'+
+  '<main><h1>'+title+'</h1><p>Демонстрационные данные · R3.0</p><p>Сформировано (UTC): '+new Date().toISOString()+'</p>'+articles+'</main></html>';
+}
+function inspectionEntries(id){return inspectionLog.filter(e=>e.pkg===id).sort((a,b)=>b.day.localeCompare(a.day))}
+function inspectionsFor(p){
+ const entries=inspectionEntries(p.id);
+ const table=tbl(['Дата','Область осмотра','Наблюдение','Последующие действия','Документ'],entries.map(e=>[esc(e.day),esc(e.scope),esc(e.finding),esc(e.action),inspectionDecisionCell(e)]));
+ return panel('Хронология осмотров '+p.id,table+actions('<button type="button" data-inspection-export="'+esc(p.id)+'">Скачать историю осмотров (HTML)</button>',btn('Добавить запись в хронологию','addObservation',p.id,st.role!=='edit')));
+}
 
 const previousStocks = {
  '31.10.2025': {'S-003':{value:1, basis:'Заявленный объём',source:'DEMO-INV-2025-03'},'S-001':{value:0,basis:'Заявленный объём',source:'DEMO-ZERO-2025-01'}},
@@ -818,6 +831,12 @@ function run(act,v,trigger=null){
  render()
 }
 document.addEventListener('click',e=>{
+ const exportButton=e.target.closest('[data-inspection-export]');
+ if(exportButton){
+  const p=pk(exportButton.dataset.inspectionExport);
+  if(p)download('Task1_'+p.id+'_inspection_history_RU.html',inspectionHistoryFile(p,inspectionEntries(p.id)),'text/html;charset=utf-8');
+  return;
+ }
  if(e.target.closest('[data-record-back]')){
   const button=$('main').querySelector('.current-record button[aria-pressed="true"]');
   if(button){button.focus({preventScroll:true});button.scrollIntoView({block:'center',inline:'nearest'})}
