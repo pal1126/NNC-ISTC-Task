@@ -5,6 +5,15 @@ url = "https://pal1126.github.io/NNC-ISTC-Task/"
 out = Path("evidence")
 out.mkdir(exist_ok=True)
 routes = "overview map objects monitor review spec packaging transport national acceptance benchmark workbench storage receiving".split()
+# Wait for Pages to serve the revision under acceptance.
+from urllib.request import urlopen
+from time import sleep
+for attempt in range(30):
+    if 'max-height: 31vh' in urlopen(url+'?check=wall-fit').read().decode():
+        break
+    sleep(5)
+else:
+    raise RuntimeError('New Pages stylesheet unavailable')
 with sync_playwright() as p:
     browser = p.chromium.launch()
     for name,w,h,mobile in [('wall',1920,1080,False),('tablet',820,1180,True),('phone',390,844,True)]:
@@ -47,6 +56,16 @@ with sync_playwright() as p:
             activate(page.locator('#sectionResults button').filter(has_text='История перевозок').first)
             page.wait_for_url('**/#transport')
             assert not page.locator('#dlg').is_visible()
+        home()
+        for site in ['S-001','S-002','S-003','S-004']:
+            activate(page.locator('[data-act="site"][data-v="'+site+'"]'))
+            assert site in page.locator('.sel20').inner_text()
+            g=geometry()
+            bounds=page.locator('.hq button:visible, .mapfoot, .foot').evaluate_all('es=>es.map(e=>e.getBoundingClientRect()).map(r=>[r.left,r.top,r.right,r.bottom])')
+            print('LAYOUT',name,site,g,'last',max(r[3] for r in bounds),flush=True)
+            assert g['width']==w
+            if name=='wall':
+                assert g['height']<=h and all(0<=r[0] and 0<=r[1] and r[2]<=w+1 and r[3]<=h+1 for r in bounds)
         home()
         page.screenshot(path=str(out/(name+'.png')))
         print(name,'HOME',geometry(),flush=True)
