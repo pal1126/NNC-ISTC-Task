@@ -200,12 +200,17 @@ let priorView=null;
 function captureView(){const {role,uploadName,...view}=st;return {view,wall:document.body.classList.contains('wall'),y:window.scrollY||0}}
 function returnControl(){
  const el=document.activeElement;
+ if(el?.matches('#nav a'))return {rail:el.hash};
+ if(el?.id && $('main').contains(el))return {id:el.id};
  if(!el?.matches('#main [data-act]'))return null;
  const peers=[...$('main').querySelectorAll('[data-act]')].filter(b=>b.dataset.act===el.dataset.act && b.dataset.v===el.dataset.v);
  return {act:el.dataset.act,value:el.dataset.v,index:peers.indexOf(el)};
 }
 function focusReturnControl(key){
- const match=key && [...$('main').querySelectorAll('[data-act]')].filter(b=>b.dataset.act===key.act && b.dataset.v===key.value)[key.index];
+ let match;
+ if(key?.rail){match=[...$('nav').querySelectorAll('a')].find(a=>a.hash===key.rail);if(!match?.getClientRects().length)match=$('menu')}
+ else if(key?.id)match=$(key.id);
+ else match=key && [...$('main').querySelectorAll('[data-act]')].filter(b=>b.dataset.act===key.act && b.dataset.v===key.value)[key.index];
  (match && match.getClientRects().length && !match.disabled ? match : $('main')).focus({preventScroll:true});
 }
 function restoreView(saved){
@@ -216,12 +221,25 @@ function restoreView(saved){
  focusReturnControl(saved.control);window.scrollTo(0,saved.y);
  history.replaceState({...history.state,saved:{...saved,view:priorView.view}},'');
 }
+function previousSection(){
+ if(!history.state?.back)return '';
+ const from=names[history.state.from];
+ return btn(from?'← Назад: '+from:'← Назад','previous');
+}
+function enterSection(){
+ const main=$('main');
+ const heading=main.querySelector('.hqhead h1')?.getClientRects().length
+  ?main.querySelector('.hqhead h1'):main.querySelector('.head h1');
+ (heading||main).focus({preventScroll:true});
+ if(!matchMedia('(prefers-reduced-motion: reduce)').matches)
+  main.animate([{opacity:.82},{opacity:1}],{duration:140,easing:'ease-out'});
+}
 function nav(n){if(!Number.isInteger(n)||n<0||n>13)n=0;if(n!==st.page){
  const tableOffsets=Array.from($('main').querySelectorAll('.scroll'),(table,i)=>[i,table.scrollLeft]).filter(([,x])=>x!==0);
  const old={...(priorView||captureView()),y:window.scrollY||0,control:returnControl(),tableOffsets};
  history.replaceState({...history.state,saved:old},'','#'+ids[st.page]);
- history.pushState({back:true},'','#'+ids[n]);
- }stop();st.page=n;$('rail').classList.remove('open');$('menu').setAttribute('aria-expanded','false');if(n!==0)document.body.classList.remove('wall');if(location.hash!=='#'+ids[n])location.hash=ids[n];render();window.scrollTo(0,0);$('main').focus({preventScroll:true})}
+ history.pushState({back:true,from:st.page},'','#'+ids[n]);
+ }stop();st.page=n;$('rail').classList.remove('open');$('menu').setAttribute('aria-expanded','false');if(n!==0)document.body.classList.remove('wall');if(location.hash!=='#'+ids[n])location.hash=ids[n];render();window.scrollTo(0,0);enterSection()}
 document.querySelector('.skip-main').addEventListener('click',event=>{event.preventDefault();$('main').focus();$('main').scrollIntoView()});
 function navBar(){return groups.map(([name,ns])=>'<h3>'+name+'</h3>'+ns.map(n=>'<a href="#'+ids[n]+'" '+(st.page===n?'aria-current="page"':'')+'>'+names[n]+'</a>').join('')).join('')}
 function overview(){let approved=objects.filter(o=>o.status==='Утверждено').length;return kpis([[sites.length,'Площадки','Условные точки на карте',1],[approved+' / '+objects.length,'Утверждённые записи','По всем типам объектов',4],[num(stock()[0].volume)+' м³','Запас по источнику','По представленным данным',8],[wastePackages.length,'Упаковки','Открыть журнал осмотров',6]])+'<div class="grid">'+panel('Площадки Казахстана',geom(sites.map(([id,n,,x,y])=>[id,n,x,y]),st.site)+actions(link('Открыть карту →','nav',1),'<small>Местоположение объектов показано условно</small>'))+panel('Сохранность и перемещение', ['Изолирована','В пути','На хранении','Внутреннее перемещение'].map(s=>{let n=wastePackages.filter(p=>p.state===s).length;return '<div class="row">'+link(s,'state',s)+'<b>'+n+'</b></div><span class="meter"><i style="width:'+100*n/wastePackages.length+'%"></i></span>'}).join('')+link('История перевозок →','nav',7))+'</div><div class="grid">'+panel('Проверка данных',tbl(['Запись','Состояние'],objects.filter(o=>o.status!=='Утверждено').map(o=>[link(o.id,'object',o.id),tag(o.status)])))+panel('Отчётный цикл',fact([['Дата учёта','31.10.2026'],['Представили сведения','1 из 4 площадок'],['Прогноз отдельно','0,8 м³'],['Обновление','Демонстрационный снимок']])+actions(link('К отчётности →','nav',8)))+'</div>'}
@@ -602,7 +620,7 @@ function canAccept(){return st.role==='review'&&staged?.role==='edit'&&staged.te
 function importPage(){const a=staged?.a;return panel('Исходный файл · CSV / UTF-8',actions(btn('Корректный пример','sample','ok'),btn('Пример с ошибками','sample','bad'),btn('Скачать шаблон','template'),'<label>Загрузить CSV <input type="file" accept=".csv,text/csv" id="upload"></label>')+'<div class="form"><label>'+esc(st.uploadName)+'<textarea id="payload" rows="5" spellcheck="false">'+esc(importText)+'</textarea></label></div><p class="sub">До 200 строк и 200 кБ. Разделитель полей — запятая, десятичный разделитель в файле — точка. Для отсутствующего значения укажите причину.</p>'+actions(btn('Проверить файл','precheck','',st.role!=='edit','primary'),btn('Подтвердить приём черновиков','commit','',!canAccept())))+(a?panel('Протокол предварительной проверки',note('Новых: '+a.counts.new+' · Повторов: '+a.counts.duplicate+' · Ошибок: '+a.counts.invalid+' · Конфликтов: '+a.counts.conflict)+(a.global_errors.length?note(a.global_errors.map(esc).join(' · ')):'')+tbl(['Строка','Исходное значение','В Бк','Результат','Замечание'],a.rows.map(r=>[link(String(r.line),'rawLine',r.line),esc([r.raw.value,r.raw.unit].filter(Boolean).join(' ')),r.canonical?esc(valueText(r.canonical)):'—',kindName[r.kind],r.issues.map(esc).join(' · ')]))):'')+panel('Квитанции',tbl(['Пакет','Создано черновиков','Пропущено повторов','Квитанция'],batchLog.map((b,i)=>[b.id,b.created,b.skipped,link('Скачать JSON','receipt',i)])))}
 const pages=[overview,mapPage,objectPage,monitor,review,dictionary,pkgPage,transport,national,acceptance,benchmark,workbench,storage,importPage];
 const captions=["Сводные показатели по Казахстану на 31 октября 2026 года. Демонстрационные данные.","Выберите площадку на карте или найдите её по названию и коду.","Найдите объект и проверьте его статус, источник сведений и историю изменений.","Сопоставьте исходные и уточнённые результаты наблюдений за выбранный период.","Проверьте записи и сформируйте отчёт по утверждённым данным.","Изучите структуру модели данных: 26 сущностей и 177 полей.","Проверьте результаты осмотров, состояние пломб и ограничения на обращение с упаковками.","Выберите рейс и проследите движение контейнера по зарегистрированным событиям.","Сопоставьте данные площадок о фактических запасах и прогнозируемом образовании РАО.","Проверьте критерии приёмки и подтверждающие документы. При необходимости запросите дополнительные сведения.","Ознакомьтесь с открытыми источниками и принятыми на их основе проектными решениями.","Выберите упаковку, чтобы посмотреть её паспорт, документы и результаты измерений.","Зарезервируйте место, сверьте перечень упаковок и подтвердите приёмку после передачи.","Проверьте файл перед импортом и передайте пакет на независимую проверку."];
-function render(){document.title=names[st.page]+' · ГИС учёта РАО · НЯЦ РК / МНТЦ';const focused=document.activeElement?.id,offset=document.activeElement?.selectionStart;$('nav').innerHTML=navBar();$('wall').textContent=document.body.classList.contains('wall')?'К рабочей области':'Режим видеостены';$('main').innerHTML='<div class="head">'+(st.page!==0?'<div class="crumb">'+(history.state?.back?btn('← Назад','previous'):'')+btn('Сводная панель','boardHome')+'<span>'+groups.find(g=>g[1].includes(st.page))[0]+'</span></div>':'')+'<h1>'+names[st.page]+'</h1><p class="sub">'+captions[st.page]+'</p></div>'+workspaceContent();document.body.classList.toggle('workspace-home',st.page===0&&!document.body.classList.contains('wall'));syncScreenButton();markCurrentRecord();prepareTables($('main'));priorView=captureView();history.replaceState({...history.state,saved:priorView},'');if(focused&&$(focused)&&['INPUT','TEXTAREA','SELECT'].includes($(focused).tagName)&&$(focused).type!=='file'){$(focused).focus({preventScroll:true});if(typeof offset==='number'&&['text','textarea'].includes($(focused).type))$(focused).setSelectionRange(offset,offset)}}
+function render(){document.title=names[st.page]+' · ГИС учёта РАО · НЯЦ РК / МНТЦ';const focused=document.activeElement?.id,offset=document.activeElement?.selectionStart;$('nav').innerHTML=navBar();$('wall').textContent=document.body.classList.contains('wall')?'К рабочей области':'Режим видеостены';$('main').innerHTML='<div class="head">'+(st.page!==0?'<div class="crumb">'+previousSection()+btn('Сводная панель','boardHome')+'<span>'+groups.find(g=>g[1].includes(st.page))[0]+'</span></div>':'')+'<h1 tabindex="-1">'+names[st.page]+'</h1><p class="sub">'+captions[st.page]+'</p></div>'+workspaceContent();document.body.classList.toggle('workspace-home',st.page===0&&!document.body.classList.contains('wall'));syncScreenButton();markCurrentRecord();prepareTables($('main'));priorView=captureView();history.replaceState({...history.state,saved:priorView},'');if(focused&&$(focused)&&['INPUT','TEXTAREA','SELECT'].includes($(focused).tagName)&&$(focused).type!=='file'){$(focused).focus({preventScroll:true});if(typeof offset==='number'&&['text','textarea'].includes($(focused).type))$(focused).setSelectionRange(offset,offset)}}
 function stop(){if(timer){clearInterval(timer);timer=null}}
 function auth(role){if(st.role===role)return true;msg(role==='edit'?'Требуется роль оператора ввода.':'Требуется роль проверяющего.');return false}
 function form(t,fields,cb){modal(t,'<form id="entry" class="form">'+fields.map(([id,l,v=''])=>id==='iresult'?select(id,'Состояние поверхности',[['1','Без видимых повреждений'],['2','Обнаружены признаки коррозии'],['3','Требуется уточнение']],'3'):'<label>'+l+'<input required maxlength="500" id="'+id+'" value="'+esc(v)+'"></label>').join('')+'<button class="primary">Сохранить</button></form>');$('entry').onsubmit=e=>{e.preventDefault();let v=fields.map(([id])=>$(id).value.trim());if(v.some(x=>!x))return msg('Заполните обязательные поля.');if(cb(...v)===false)return;$('dlg').close();render()}}
@@ -716,7 +734,23 @@ function run(act,v,trigger=null){
  if(act==='assayCsv'){const keys=['package_id','nuclide','qualifier','value_Bq','reference_at','source_ref','quality','method'];return csv('Task1_RU_assays.csv',[keys,...assayRows().map(a=>keys.map(k=>a[k]))])}
  render()
 }
-document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&!b.disabled){if(b.tagName==='A')e.preventDefault();run(b.dataset.act,b.dataset.v,b)}const s=e.target.closest('[data-site]');if(s)run('site',s.dataset.site,s);if(e.target.closest('#nav a')){e.preventDefault();nav(ids.indexOf(e.target.closest('a').hash.slice(1))) }});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&!b.disabled){if(b.tagName==='A')e.preventDefault();run(b.dataset.act,b.dataset.v,b)}const s=e.target.closest('[data-site]');if(s)run('site',s.dataset.site,s);if(e.target.closest('#nav a')&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();nav(ids.indexOf(e.target.closest('a').hash.slice(1))) }});
+function sectionSearchKeys(e){
+ if(e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey)return;
+ const input=$('sectionQuery'),results=$('sectionResults');
+ if(!input || !$('dlg').open || !(e.target===input || results?.contains(e.target)))return;
+ const buttons=[...results.querySelectorAll('button')],index=buttons.indexOf(e.target);
+ if(e.key==='Enter' && e.target===input){
+  e.preventDefault();
+  if(buttons.length===1)buttons[0].click();
+  else buttons[0]?.focus();
+ }else if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+  e.preventDefault();
+  if(e.key==='ArrowUp' && index<=0)input.focus();
+  else buttons[Math.min(buttons.length-1,index+(e.key==='ArrowDown'?1:-1))]?.focus();
+ }
+}
+document.addEventListener('keydown',sectionSearchKeys);
 document.addEventListener('keydown',e=>{if(e.key==='Escape' && $('dlg').open && e.target.id==='sectionQuery'){e.preventDefault();$('dlg').close();return}if(e.key==='Escape'&&$('rail').classList.contains('open')){$('menu').click();$('menu').focus()}if(['Enter',' '].includes(e.key)&&e.target.hasAttribute('data-site')){e.preventDefault();run('site',e.target.dataset.site,e.target)}});
 $('menu').onclick=()=>{$('menu').setAttribute('aria-expanded',String($('rail').classList.toggle('open')))};
 $('wall').onclick=()=>{const on=!document.body.classList.contains('wall');document.body.classList.toggle('wall',on);if(on)nav(0);else render()};
@@ -756,7 +790,7 @@ function displayBoard(){
  }).join('');
  const checks=attention.map(p=>btn('<b>'+esc(p.id)+'</b><span>'+esc(p.condition)+'</span><small>'+(p.seal==='Не проверена'?'Пломба не проверена':'Открыть журнал осмотров')+'</small>','inspection',p.id,false,'task20')).join('');
  const queue=pending.map(o=>btn('<small>'+esc(o.id)+' · '+esc(o.status)+'</small><b>'+esc(o.name)+'</b>','object',o.id,false,'task20')).join('');
- return '<section class="board hq"><header class="hqhead"><div><p class="ey">Республика Казахстан · НЯЦ РК / МНТЦ</p><h1>Учёт и контроль радиоактивных отходов</h1><p class="stamp20">Демонстрационные данные · Данные о запасах на '+reportDate+'</p></div><div class="tools">'+btn('Разделы системы','sections')+btn('Рабочая область','workspace')+btn('Во весь экран','screen')+'</div></header>'+
+ return '<section class="board hq"><header class="hqhead"><div><p class="ey">Республика Казахстан · НЯЦ РК / МНТЦ</p><h1 tabindex="-1">Учёт и контроль радиоактивных отходов</h1><p class="stamp20">Демонстрационные данные · Данные о запасах на '+reportDate+'</p></div><div class="tools">'+previousSection()+btn('Разделы системы','sections')+btn('Рабочая область','workspace')+btn('Во весь экран','screen')+'</div></header>'+
  '<div class="hqmetrics">'+stat('Фактический запас',volumeOf('Фактический запас')+' м³','Представили сведения: '+coverage()+' из '+sites.length,'basisBoard','Фактический запас')+stat('Прогноз образования',volumeOf('Прогноз')+' м³','По представленным сведениям','basisBoard','Прогноз')+stat('Упаковки на учёте',new Set(wastePackages.map(p=>p.id)).size,'По данным реестра','state','')+stat('Записи на проверке',pending.length,'Открыть очередь проверки','nav',4)+'</div>'+
  '<div class="hqgrid"><section class="atlas20"><header><h2>Карта площадок</h2>'+mapLegend()+'</header>'+coverageRibbon()+geom(sites.map(([id,n,,x,y])=>[id,n,x,y]),site[0])+'<div class="sel20" aria-live="polite" aria-atomic="true"><div><small>'+site[0]+' · '+esc(site[2])+'</small><h3>'+esc(site[1])+'</h3><p>'+declarationText(site[0])+' · '+reportDate+'</p><small>Дата получения сведений: '+(declaration(site[0]).received||'нет данных')+'</small></div><div class="siteops">'+btn('Карточка площадки','siteCard',site[0])+btn('Запасы площадки','siteReport',site[0])+siteNav(site)+'</div></div><small class="mapfoot">Расположение площадок условное.</small></section>'+
  '<aside class="left20"><section class="pane20"><h2>Сохранность упаковок</h2><div class="donut20" style="--pct:'+100*intact/Math.max(total,1)+'%"><div><strong>'+intact+' / '+total+'</strong></div></div><p class="donutlabel">Без видимых повреждений</p>'+checks+btn('Просроченные осмотры · '+wastePackages.filter(p=>inspectionTerm(p)==='Просрочен').length,'inspectQueue','',false,'flow20')+'</section><section class="pane20"><h2>Размещение и перемещение</h2>'+placement+'</section></aside>'+
