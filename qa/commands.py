@@ -88,7 +88,7 @@ cases = """
 11|assayCsv||FILE
 11|evidence|assays[0].source_ref|D
 11|case|'PKG-004'|st.selectedCase==='PKG-004'
-9|request|'PKG-003'|requests.at(-1).q==='QA'
+9|request|'PKG-004'|requests.at(-1).q==='QA'
 9|reply|requests.at(-1).id|requests.at(-1).reply==='QA'
 9|verify|requests.at(-1).id|requests.at(-1).state==='Закрыто'
 7|pkgTrip|0|st.page===7 && st.min===0
@@ -172,9 +172,11 @@ with sync_playwright() as pw:
                         if size=='wall':buttons.first.click()
                         else:buttons.first.tap()
                         method='click' if size=='wall' else 'tap'
-                    else:page.evaluate('([c,v])=>{run(c,v)}',[cmd,value])
+                    else:raise AssertionError('No visible enabled command control in the prepared view')
                 if check=='FILE':
-                    with page.expect_download() as event:invoke()
+                    from time import sleep
+                    sleep(0.20)  # Keep rapid automated exports below Chromium's download burst limit.
+                    with page.expect_download(timeout=6000) as event:invoke()
                     d=event.value
                     raw=Path(d.path()).read_bytes()
                     assert raw
