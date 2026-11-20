@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function showInspectionSummary' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'const returnedInspections=' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -206,6 +206,7 @@ with sync_playwright() as p:
         page.locator('#role').select_option('edit')
         activate(page.locator('[data-act="inspectSubmit"][data-v="PKG-004"]'))
         page.locator('#inext').fill('2026-12-20')
+        page.locator('#iresult').select_option('2')
         page.locator('#iaction').fill('Повторная проверка')
         page.locator('#iref').fill('DEMO-TEST-CHECK')
         activate(page.locator('#entry button.primary'))
@@ -216,6 +217,37 @@ with sync_playwright() as p:
         assert 'DEMO-TEST-CHECK' in page.locator('#dlg').inner_text()
         assert 'Просрочен на 6 дн.' in page.locator('#dlg').inner_text()
         page.keyboard.press('Escape')
+        review=page.locator('[data-act="inspectReview"][data-v="PKG-004"]')
+        edit=page.locator('[data-act="inspectSubmit"][data-v="PKG-004"]')
+        page.locator('#role').select_option('review')
+        activate(review)
+        activate(page.locator('[data-act="inspectReturn"]'))
+        page.locator('#ireason').fill('Уточните номер протокола.')
+        activate(page.locator('#entry button.primary'))
+        page.locator('#inspectionTerm').select_option('На доработке')
+        assert edit.is_disabled()
+        page.locator('#role').select_option('edit')
+        activate(edit)
+        assert 'Уточните номер протокола.' in page.locator('#dlg').inner_text()
+        assert page.locator('#iresult').input_value()=='2'
+        assert page.locator('#iref').input_value()=='DEMO-TEST-CHECK'
+        assert page.locator('#inext').input_value()=='2026-12-20'
+        assert page.locator('#iaction').input_value()=='Повторная проверка'
+        page.locator('#iref').fill('DEMO-TEST-R2')
+        activate(page.locator('#entry button.primary'))
+        assert edit.count()==0
+        page.locator('#inspectionTerm').select_option('На проверке')
+        page.locator('#role').select_option('review')
+        activate(review)
+        assert 'DEMO-TEST-R2' in page.locator('#dlg').inner_text()
+        activate(page.locator('[data-act="inspectApprove"]'))
+        assert review.count()==0
+        page.locator('#inspectionTerm').select_option('Запланирован')
+        activate(opener)
+        assert 'DEMO-TEST-R2' in page.locator('#dlg').inner_text()
+        assert page.locator('#dlg h3').count()==1
+        page.keyboard.press('Escape')
+        print('INSPECTION CORRECTION',name,'PASS',flush=True)
         print('INSPECTION QUEUE',name,'PASS',flush=True)
         print('SECTION TRANSITIONS',name,'PASS',flush=True)
         print('REGISTER SEARCH',name,'PASS',flush=True)
