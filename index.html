@@ -352,6 +352,7 @@ function dictionary(){const q=st.fields.trim().toLowerCase(),e=entities.find(x=>
 
 const inspectionAsOf='2026-11-20';
 const inspectionPending=new Map();
+const returnedInspections=new Map();
 const dayValid=d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&Number.isFinite(Date.parse(d))&&new Date(d).toISOString().slice(0,10)===d;
 function inspectionTerm(p){
  if(!dayValid(p.next))return 'Срок не указан';
@@ -371,22 +372,31 @@ function showInspectionSummary(p){
   ['Статус на отчётную дату',inspectionDeadline(p)]]);
  const submitted=pending?'<h3>Передано на проверку</h3>'+fact([['Дата осмотра',esc(pending.day)],['Результат',esc(pending.result)],
   ['Принятые меры',esc(pending.action)],['Предлагаемая дата следующего осмотра',esc(pending.next)],['Протокол',esc(pending.source)]]):'';
- modal('Повторный осмотр · '+esc(p.id),'<div class="inspection-summary"><h3>Подтверждённые сведения</h3>'+details+submitted+'</div>');
+ const returned=returnedInspections.get(p.id);
+ const feedback=returned?'<h3>Возвращено на доработку</h3>'+fact([['Замечание проверяющего',esc(returned.reason)],['Протокол',esc(returned.source)]]):'';
+ modal('Повторный осмотр · '+esc(p.id),'<div class="inspection-summary"><h3>Подтверждённые сведения</h3>'+details+submitted+feedback+'</div>');
 }
 function controlPanel(){
  const filter=st.inspectionTerm||'';
- const rows=wastePackages.filter(p=>!filter||(filter==='На проверке'?inspectionPending.has(p.id):inspectionTerm(p)===filter)).sort((a,b)=>(a.next||'9999').localeCompare(b.next||'9999')||a.id.localeCompare(b.id));
+ const rows=wastePackages.filter(p=>!filter||(filter==='На проверке'?inspectionPending.has(p.id):filter==='На доработке'?returnedInspections.has(p.id):inspectionTerm(p)===filter)).sort((a,b)=>(a.next||'9999').localeCompare(b.next||'9999')||a.id.localeCompare(b.id));
  return panel('Контроль повторных осмотров',note('Сроки по карточкам упаковок на 20.11.2026 · учебные данные.')+
- filters(select('inspectionTerm','Показать',all(['Просрочен','Назначен на сегодня','Запланирован','Срок не указан','На проверке']),filter))+
- tbl(['Упаковка','Следующий осмотр','Срок','Последний подтверждённый результат','Документ','Действие'],rows.map(p=>[link(p.id,'inspection',p.id),esc(p.next||'—'),inspectionDeadline(p),esc(p.condition),link(esc(p.source),'evidence',p.source),inspectionPending.has(p.id)?btn('Проверить запись','inspectReview',p.id):btn('Оформить повторный осмотр','inspectSubmit',p.id,st.role!=='edit')])));
+ filters(select('inspectionTerm','Показать',all(['Просрочен','Назначен на сегодня','Запланирован','Срок не указан','На проверке','На доработке']),filter))+
+ tbl(['Упаковка','Следующий осмотр','Срок','Последний подтверждённый результат','Документ','Действие'],rows.map(p=>[link(p.id,'inspection',p.id),esc(p.next||'—'),inspectionDeadline(p),esc(p.condition),link(esc(p.source),'evidence',p.source),inspectionPending.has(p.id)?btn('Проверить запись','inspectReview',p.id):btn(returnedInspections.has(p.id)?'Исправить запись':'Оформить повторный осмотр','inspectSubmit',p.id,st.role!=='edit')])));
 }
 function submitInspection(p){
  if(st.role!=='edit'||inspectionPending.has(p.id))return;
- form('Повторный осмотр '+p.id,[['iday','Дата осмотра (ГГГГ-ММ-ДД)',inspectionAsOf],['inext','Дата следующего осмотра (ГГГГ-ММ-ДД)'],['iresult','Состояние поверхности: 1 — без видимых повреждений, 2 — признаки коррозии, 3 — требуется уточнение'],['iaction','Принятые меры или основание для дальнейшего наблюдения'],['iref','Номер и редакция протокола']],(day,next,code,action,source)=>{
+ const draft=returnedInspections.get(p.id);
+ form((draft?'Доработка записи об осмотре ':'Повторный осмотр ')+p.id,[
+ ['iday','Дата осмотра (ГГГГ-ММ-ДД)',draft?.day||inspectionAsOf],
+ ['inext','Дата следующего осмотра (ГГГГ-ММ-ДД)',draft?.next],
+ ['iresult','Состояние поверхности',draft?.code],
+ ['iaction','Принятые меры или основание для дальнейшего наблюдения',draft?.action],
+ ['iref','Номер и редакция протокола',draft?.source]],(day,next,code,action,source)=>{
  const result={'1':'Без видимых повреждений','2':'Обнаружены признаки коррозии','3':'Требуется уточнение'}[code];
  if(!dayValid(day)||!dayValid(next)||day<p.last||day>inspectionAsOf||next<=day||!['1','2','3'].includes(code)){msg('Проверьте даты и код состояния поверхности.');return false}
- inspectionPending.set(p.id,{day,next,result,action,source});log(p.id,'Повторный осмотр передан на проверку',source);
- });
+ inspectionPending.set(p.id,{day,next,code,result,action,source});returnedInspections.delete(p.id);
+ log(p.id,draft?'Исправленная запись повторно передана на проверку':'Повторный осмотр передан на проверку',source);
+ },draft?fact([['Замечание проверяющего',esc(draft.reason)]]):'');
 }
 function reviewInspection(p){
  const x=inspectionPending.get(p.id);if(!x)return;
@@ -668,7 +678,7 @@ const captions=["Сводные показатели по Казахстану �
 function render(){document.title=names[st.page]+' · ГИС учёта РАО · НЯЦ РК / МНТЦ';const focused=document.activeElement?.id,offset=document.activeElement?.selectionStart;$('nav').innerHTML=navBar();$('wall').textContent=document.body.classList.contains('wall')?'К рабочей области':'Режим видеостены';$('main').innerHTML='<div class="head">'+(st.page!==0?'<div class="crumb">'+previousSection()+btn('Сводная панель','boardHome')+'<span>'+groups.find(g=>g[1].includes(st.page))[0]+'</span></div>':'')+'<h1 tabindex="-1">'+names[st.page]+'</h1><p class="sub">'+captions[st.page]+'</p></div>'+workspaceContent();document.body.classList.toggle('workspace-home',st.page===0&&!document.body.classList.contains('wall'));syncScreenButton();markCurrentRecord();prepareTables($('main'));priorView=captureView();history.replaceState({...history.state,saved:priorView},'');if(focused&&$(focused)&&['INPUT','TEXTAREA','SELECT'].includes($(focused).tagName)&&$(focused).type!=='file'){$(focused).focus({preventScroll:true});if(typeof offset==='number'&&['text','textarea'].includes($(focused).type))$(focused).setSelectionRange(offset,offset)}}
 function stop(){if(timer){clearInterval(timer);timer=null}}
 function auth(role){if(st.role===role)return true;msg(role==='edit'?'Требуется роль оператора ввода.':'Требуется роль проверяющего.');return false}
-function form(t,fields,cb){modal(t,'<form id="entry" class="form">'+fields.map(([id,l,v=''])=>id==='iresult'?select(id,'Состояние поверхности',[['1','Без видимых повреждений'],['2','Обнаружены признаки коррозии'],['3','Требуется уточнение']],'3'):'<label>'+l+'<input required maxlength="500" id="'+id+'" value="'+esc(v)+'"></label>').join('')+'<button class="primary">Сохранить</button></form>');$('entry').onsubmit=e=>{e.preventDefault();let v=fields.map(([id])=>$(id).value.trim());if(v.some(x=>!x))return msg('Заполните обязательные поля.');if(cb(...v)===false)return;$('dlg').close();render()}}
+function form(t,fields,cb,intro=''){modal(t,intro+'<form id="entry" class="form">'+fields.map(([id,l,v=''])=>id==='iresult'?select(id,'Состояние поверхности',[['1','Без видимых повреждений'],['2','Обнаружены признаки коррозии'],['3','Требуется уточнение']],v||'3'):'<label>'+l+'<input required maxlength="500" id="'+id+'" value="'+esc(v)+'"></label>').join('')+'<button class="primary">Сохранить</button></form>');$('entry').onsubmit=e=>{e.preventDefault();let v=fields.map(([id])=>$(id).value.trim());if(v.some(x=>!x))return msg('Заполните обязательные поля.');if(cb(...v)===false)return;$('dlg').close();render()}}
 function showReview(id){const o=ob(id);if(!o)return;let blocked=o.id==='P-001'?measures.some(m=>m.check&&m.point===id):o.id==='W-002'&&(!o.scenario||!o.reference);
 modal('Проверка '+o.id,fact([['Наименование',o.name],['Состояние',tag(o.status)],['Редакция','v'+o.ver],['Источник',o.source]])+(blocked?note(id==='W-002'?'Укажите сценарий прогноза и дату приведения активности.':'Требуется проверить аномальный результат измерения M-006.'):'')+actions(btn('Уточнить данные','correctObj',id,st.role!=='edit'),btn('Утвердить','approve',id,st.role!=='review'||blocked),btn('Вернуть на доработку','return',id,st.role!=='review')))}
 function commit(){if(!canAccept())return;const a=diagnoseImport09(importText);if(receivingSignature09(a)!==receivingSignature09(staged.a)){staged=null;msg('Исходное состояние изменилось. Повторите проверку.');return}const id='IMP-'+String(batchLog.length+1).padStart(3,'0');for(const r of a.rows.filter(r=>r.kind==='new')){acceptedRowRegistry09.set(r.key,{fingerprint:r.fingerprint});assays.push({...r.canonical,quality:'Черновик импорта',method:'Пересчёт единиц по CSV',batch:id})}batchLog.push({id,created:a.counts.new,skipped:a.counts.duplicate,profile:ingestProfile09.version,filename:st.uploadName,at:new Date().toISOString(),rows:a.rows.map(r=>({source:r.raw.source_ref,row:r.raw.source_row_id,status:r.kind}))});staged.accepted=true;log(id,'Приняты черновики измерений');msg('Черновики доступны в паспортах упаковок.')}
@@ -677,7 +687,7 @@ function run(act,v,trigger=null){
  if(act==='inspectSubmit')return submitInspection(pk(v));
  if(act==='inspectReview')return reviewInspection(pk(v));
  if(act==='inspectApprove')return approveInspection(pk(v));
- if(act==='inspectReturn'&&st.role==='review'&&inspectionPending.has(v))return form('Возврат записи '+esc(v),[['ireason','Замечание проверяющего']],reason=>{const x=inspectionPending.get(v);inspectionLog.unshift({pkg:v,day:x.day,scope:'Запись возвращена',finding:x.result,action:reason,source:x.source});inspectionPending.delete(v);log(v,'Запись осмотра возвращена',reason)});
+ if(act==='inspectReturn'&&st.role==='review'&&inspectionPending.has(v))return form('Возврат записи '+esc(v),[['ireason','Замечание проверяющего']],reason=>{const x=inspectionPending.get(v);inspectionLog.unshift({pkg:v,day:x.day,scope:'Запись возвращена',finding:x.result,action:reason,source:x.source});returnedInspections.set(v,{...x,reason});inspectionPending.delete(v);log(v,'Запись осмотра возвращена',reason)});
  if(act==='capacity')return capacityCard(v);
  if(act==='capacityCsv'){const r=capacityRecords.find(x=>x.facility===v);if(r)return csv('Task1_capacity_'+v+'.csv',[capacityHeaders,capacityValues(r)]);return}
  if(act==='clearPageFilters'){Object.assign(st,filterDefaults[st.page]||{});render();$('main').querySelector('.filters input,.filters select,#pageJump')?.focus({preventScroll:true});msg('Фильтры сброшены.');return}
