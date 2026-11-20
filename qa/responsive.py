@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function endSectionTransition' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function openRegisterRecord' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -139,8 +139,27 @@ with sync_playwright() as p:
             box.fill(query)
             assert rows.count()==1 and rows.first.get_attribute('data-v')==wanted
             assert rows.first.get_attribute('aria-pressed')=='true'
+            if route in ('objects','packaging'):
+                assert '1 из '+str(total) in page.locator('.register-summary').inner_text()
+                history_size=page.evaluate('history.length')
+                if mobile:
+                    activate(rows.first)
+                else:
+                    rows.first.focus()
+                    rows.first.press('Enter')
+                detail=page.locator('#record-detail')
+                assert wanted in detail.locator('h2').inner_text()
+                assert detail.evaluate('e=>document.activeElement===e')
+                assert detail.locator('h2').evaluate('e=>{const r=e.getBoundingClientRect();return r.top>=0 && r.bottom<=innerHeight}')
+                activate(detail.locator('[data-record-back]'))
+                assert rows.first.evaluate('e=>document.activeElement===e')
+                assert rows.first.evaluate('e=>{const r=e.getBoundingClientRect();return r.top>=0 && r.bottom<=innerHeight}')
+                assert box.input_value()==query and page.evaluate('history.length')==history_size
+                print('REGISTER DETAIL',name,route,'PASS',flush=True)
             box.fill(query+' xyz')
             assert rows.count()==0
+            if route in ('objects','packaging'):
+                assert not page.locator('#record-detail').count()
             box.fill('')
             assert rows.count()==total
         home()
