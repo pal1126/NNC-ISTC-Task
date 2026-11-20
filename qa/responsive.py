@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function sectionSearchKeys' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function endSectionTransition' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -162,6 +162,10 @@ with sync_playwright() as p:
         page.emulate_media(reduced_motion='reduce')
         activate(page.locator('[data-act="siteCard"]'))
         assert page.locator('#main').evaluate('e=>e.getAnimations().length')==0
+        activate(page.locator('.pagejump [data-act="sections"]'))
+        page.go_back()
+        page.locator('.hq').wait_for()
+        assert not page.locator('#dlg').is_visible()
         page.emulate_media(reduced_motion='no-preference')
         print('SECTION TRANSITIONS',name,'PASS',flush=True)
         print('REGISTER SEARCH',name,'PASS',flush=True)
