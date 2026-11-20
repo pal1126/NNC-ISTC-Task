@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'class="site-hit"' in urlopen(url+'?check=wall-fit').read().decode():
+    if "e.target.id==='sectionQuery'" in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -55,7 +55,7 @@ with sync_playwright() as p:
             page.locator('#sectionQuery').fill('перевоз')
             activate(page.locator('#sectionResults button').filter(has_text='История перевозок').first)
             page.wait_for_url('**/#transport')
-            assert not page.locator('#dlg').is_visible()
+            page.locator('#dlg').wait_for(state='hidden')
         home()
         for site in ['S-001','S-002','S-003','S-004']:
             activate(page.locator('[data-act="site"][data-v="'+site+'"]'))
