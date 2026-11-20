@@ -21,7 +21,7 @@ cases = """
 7|boardHome||st.page===0 && document.body.classList.contains('wall')
 0|screen||!!document.fullscreenElement
 0|workspace||!document.body.classList.contains('wall')
-0|nav|1|st.page===1
+0|nav|4|st.page===4
 1|site|'S-003'|st.site==='S-003'
 1|pins||st.mapPins!==before.mapPins
 1|siteObjects|'S-003'|st.page===2 && st.objQ==='S-003'
@@ -84,10 +84,10 @@ cases = """
 6|state|'На хранении'|st.pkgFilter==='На хранении'
 6|pkgCsv||FILE
 6|passport|'PKG-004'|st.page===11 && st.tab==='Паспорт'
-11|tab|'История'|st.tab==='История'
+11|tab|'Запросы'|st.tab==='Запросы'
 11|assayCsv||FILE
 11|evidence|assays[0].source_ref|D
-9|case|'PKG-003'|st.selectedCase==='PKG-003'
+11|case|'PKG-004'|st.selectedCase==='PKG-004'
 9|request|'PKG-003'|requests.at(-1).q==='QA'
 9|reply|requests.at(-1).id|requests.at(-1).reply==='QA'
 9|verify|requests.at(-1).id|requests.at(-1).state==='Закрыто'
@@ -106,7 +106,7 @@ cases = """
 12|manifestFile|0|FILE
 12|receiptEntry|0|receiptHistory.get(manifests[0].id).at(-1).clean
 12|receiptCheck|0|receiptHistory.get(manifests[0].id).at(-1).checked
-13|sample|'good'|importText===demoIngestCSV09(false)
+13|sample|'ok'|importText===demoIngestCSV09(false)
 13|template||FILE
 13|precheck||staged.a.counts.new>0
 13|rawLine|staged.a.rows[0].line|D
@@ -125,18 +125,41 @@ with sync_playwright() as pw:
     for size,w,h in [('wall',1920,1080),('tablet',820,1180),('phone',390,844)]:
         page=browser.new_page(viewport={'width':w,'height':h},has_touch=size!='wall',is_mobile=size!='wall')
         page.set_default_timeout(1800)
+        errors=[]
+        page.on('pageerror',lambda e:errors.append(str(e)))
         page.goto(URL)
         page.evaluate("window.inView=id=>{let r=document.getElementById(id).getBoundingClientRect(); return r.top>=-2 && r.top<innerHeight}; window.print=()=>window.__printCalled=true")
         for line in cases:
             n,cmd,arg,check=line.split('|',3)
             method='handler'
-            detail=''
+            detail='';errors.clear()
             try:
                 role='edit' if cmd in edit else 'review'
                 page.evaluate("""([n,cmd,role])=>{
                     if($('dlg').open && !['openSection','inspectApprove','inspectReturn'].includes(cmd)) $('dlg').close();
                     if(st.page!==n)nav(n);
                     if(st.role!==role){$('role').value=role;$('role').dispatchEvent(new Event('change'))}
+                    if(['annualHome','receiptHome','inspectQueue','state','stationOpen','legacySite','nav'].includes(cmd)){
+                        document.body.classList.add('wall'); if(st.page!==0) nav(0);render();
+                    }
+                    if(cmd==='legacySite'||cmd==='stationOpen') run('site','S-001');
+                    if(cmd==='object')nav(4);
+                    if(cmd==='inventoryCard')nav(8);
+                    if(cmd==='capacity'){nav(2);run('object',capacityRecords[0].facility)}
+                    if(cmd==='capacityCsv')capacityCard(capacityRecords[0].facility);
+                    if(cmd==='streamFile')streamCard(demoStreams[0]);
+                    if(cmd==='processDetails')inventoryCard(ob(processLedger[0].record));
+                    if(cmd==='processCSV')processDetails(processLedger[0].id);
+                    if(cmd==='volumeEvidence')inventoryCard(ob('W-001'));
+                    if(['stockCsv','classCSV','sectorCsv'].includes(cmd)){st.natSite='';st.basis='';render()}
+                    if(['approve','return','correctObj'].includes(cmd))showReview('W-002');
+                    if(['releaseFile','frozenCsv'].includes(cmd))snapshotDetails(reports.length-1);
+                    if(cmd==='print')nav(4);
+                    if(cmd==='inspection'){nav(11);run('passport','PKG-003')}
+                    if(cmd==='pickPkg'){st.pkgQ='';st.pkgFilter='';render()}
+                    if(cmd==='inspectApprove')reviewInspection(pk('PKG-004'));
+                    if(cmd==='passport'){nav(6);run('inspection','PKG-004')}
+                    if(cmd==='pkgTrip'){nav(11);run('passport',trips[0].packs[0])}
                     if(cmd==='ticket'){st.fields='qa-test';render()}
                     if(cmd==='reserve'){st.slot=slots().find(s=>s!==pk('PKG-003').place);render()}
                     window.before={...st}
@@ -178,7 +201,7 @@ with sync_playwright() as pw:
                     detail=page.locator('#dialogTitle').inner_text() if check=='D' else check
                 result='PASS'
             except Exception as ex:
-                result='FAIL';detail=str(ex).split('Call log:')[0][:350]
+                result='FAIL';detail=str(ex).split('Call log:')[0][:300]+' '+str(errors)+' '+page.evaluate("JSON.stringify({page:st.page,modal:$('dlg').open,message:$('msg').textContent})")
             row=[size,cmd,method,result,detail]
             results.append(row)
             print('CASE',json.dumps(row,ensure_ascii=False),flush=True)
