@@ -214,6 +214,8 @@ function focusReturnControl(key){
  (match && match.getClientRects().length && !match.disabled ? match : $('main')).focus({preventScroll:true});
 }
 function restoreView(saved){
+ endSectionTransition();
+ if($('dlg').open)$('dlg').close();
  stop();Object.assign(st,saved.view);document.body.classList.toggle('wall',saved.wall);
  $('rail').classList.remove('open');$('menu').setAttribute('aria-expanded','false');render();
  const tables=$('main').querySelectorAll('.scroll');
@@ -226,13 +228,20 @@ function previousSection(){
  const from=names[history.state.from];
  return btn(from?'← Назад: '+from:'← Назад','previous');
 }
+let sectionAnimation;
+function endSectionTransition(){
+ sectionAnimation?.cancel();
+ sectionAnimation=null;
+}
+matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',endSectionTransition);
 function enterSection(){
+ endSectionTransition();
  const main=$('main');
  const heading=main.querySelector('.hqhead h1')?.getClientRects().length
   ?main.querySelector('.hqhead h1'):main.querySelector('.head h1');
  (heading||main).focus({preventScroll:true});
  if(!matchMedia('(prefers-reduced-motion: reduce)').matches)
-  main.animate([{opacity:.82},{opacity:1}],{duration:140,easing:'ease-out'});
+  sectionAnimation=main.animate([{opacity:.82},{opacity:1}],{duration:140,easing:'ease-out'});
 }
 function nav(n){if(!Number.isInteger(n)||n<0||n>13)n=0;if(n!==st.page){
  const tableOffsets=Array.from($('main').querySelectorAll('.scroll'),(table,i)=>[i,table.scrollLeft]).filter(([,x])=>x!==0);
