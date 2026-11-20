@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function focusReturnControl' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function recordSearch' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -124,6 +124,25 @@ with sync_playwright() as p:
         page.wait_for_url('**/#map')
         verify_return()
         print('RETURN CONTEXT',name,'PASS',top,left,flush=True)
+        home()
+        for route,field,action,query,wanted in [
+            ('map','mapQ','site','  площадка   S ‑ 003  Западная ','S-003'),
+            ('objects','objQ','pickObj','реабилитации  f – 001','F-001'),
+            ('packaging','pkgQ','pickPkg','Р02   pkg − 003','PKG-003')
+        ]:
+            page.goto(url+'#'+route)
+            box=page.locator('#'+field)
+            rows=page.locator('#main table [data-act="'+action+'"]')
+            box.fill(' ')
+            total=rows.count()
+            assert total>1
+            box.fill(query)
+            assert rows.count()==1 and rows.first.get_attribute('data-v')==wanted
+            box.fill(query+' xyz')
+            assert rows.count()==0
+            box.fill('')
+            assert rows.count()==total
+        print('REGISTER SEARCH',name,'PASS',flush=True)
         home()
         page.screenshot(path=str(out/(name+'.png')))
         print(name,'HOME',geometry(),flush=True)
