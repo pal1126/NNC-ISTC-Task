@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function inspectionHistoryFile' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function inspectionFieldError' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -209,6 +209,22 @@ with sync_playwright() as p:
         page.locator('#iresult').select_option('2')
         page.locator('#iaction').fill('Повторная проверка')
         page.locator('#iref').fill('DEMO-TEST-CHECK')
+        for field,value,reason in [
+            ('iday','31.02.2026','существующую дату'),
+            ('iday','01.11.2026','последнему подтверждённому'),
+            ('iday','21.11.2026','отчётной даты'),
+            ('inext','31.11.2026','существующую дату'),
+            ('inext','20.11.2026','позже текущего')]:
+            box=page.locator('#'+field)
+            box.fill(value)
+            activate(page.locator('#entry button.primary'))
+            assert box.evaluate('el=>el===document.activeElement')
+            assert reason in page.locator('#'+field+'-error').inner_text()
+            assert box.get_attribute('aria-invalid')=='true'
+            assert page.locator('#iref').input_value()=='DEMO-TEST-CHECK'
+            box.fill('20.11.2026' if field=='iday' else '20.12.2026')
+            assert not page.locator('#'+field+'-error').count()
+        print('INSPECTION DATE VALIDATION',name,'PASS',flush=True)
         activate(page.locator('#entry button.primary'))
         page.locator('#dlg').wait_for(state='hidden')
         page.locator('#inspectionTerm').select_option('На проверке')
