@@ -283,13 +283,15 @@ with sync_playwright() as p:
         assert downloaded.suggested_filename=='Task1_PKG-004_inspection_history_RU.html'
         offline=browser.new_context(offline=True,viewport={'width':w,'height':h})
         copy=offline.new_page()
-        copy.goto(downloaded.path().as_uri())
+        saved=out/(name+'-'+downloaded.suggested_filename)
+        downloaded.save_as(saved)
+        copy.goto(saved.resolve().as_uri())
         assert copy.locator('html').get_attribute('lang')=='ru'
         assert 'PKG-004' in copy.title()
         assert copy.locator('article').count()==4
         assert copy.locator('.inspection-decision[open]').count()==3
         assert copy.locator('.inspection-decision summary').all_text_contents()==decisions.locator('summary').all_text_contents()
-        assert copy.locator('.inspection-decision').all_inner_texts()==decisions.all_inner_texts()
+        assert copy.locator('.inspection-decision').all_text_contents()==decisions.all_text_contents()
         assert 'PKG-003' not in copy.locator('main').inner_text()
         assert copy.evaluate('document.documentElement.scrollWidth<=innerWidth')
         offline.close()
