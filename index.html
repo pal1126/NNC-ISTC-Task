@@ -138,9 +138,27 @@ function xy(lon,lat){return [65+(lon-46.49)/40.83*770,460-(lat-40.55)/14.89*420]
 function geom(points,selected='',route=[]){const p=points.map(([id,n,x,y])=>{let [cx,cy]=xy(x,y);const place=id.startsWith('S-'),missing=place&&declaration(id).kind==='missing';return '<g '+(id.startsWith('S-')?'data-site="'+id+'" role="button" tabindex="0" aria-pressed="'+(id===selected)+'" aria-label="'+esc(n)+'"':'')+'><title>'+esc(n)+'</title>'+(place?'<circle class="site-hit" cx="'+cx+'" cy="'+cy+'" r="6" fill="transparent"/>':'')+(place&&id===selected?'<circle cx="'+cx+'" cy="'+cy+'" r="14" fill="none" stroke="#ffd58a" stroke-width="3"/>':'')+'<circle cx="'+cx+'" cy="'+cy+'" r="15" fill="'+(id===selected?'#f7bd68':'#51d7c0')+'" opacity=".2"/><circle cx="'+cx+'" cy="'+cy+'" r="6" fill="'+(place?(missing?'#a8b9c9':'#5ee9bb'):(id===selected?'#f7bd68':'#74ebcf'))+'"/><text x="'+(cx+12)+'" y="'+(cy-7)+'" font-size="17" fill="#eff8fb">'+esc(id)+'</text></g>'}).join('');return '<svg class="map" viewBox="0 0 900 495" aria-label="Карта Казахстана с условными объектами"><defs><pattern id="gridmap" width="37" height="37" patternUnits="userSpaceOnUse"><path d="M37 0H0V37" stroke="#245064" fill="none"/></pattern></defs><rect width="900" height="495" fill="url(#gridmap)" opacity=".4"/><path d="'+KZ_PATH+'" fill="#1a4c60" stroke="#67adb6" stroke-width="2"/><text x="340" y="290" font-size="27" fill="#6c9eab" letter-spacing="4">КАЗАХСТАН</text>'+route.map(pair=>'<path d="M'+xy(...pair[0]).join(' ')+'L'+xy(...pair[1]).join(' ')+'" stroke="#e5b768" stroke-width="3" fill="none"/>').join('')+p+'</svg>'}
 let priorView=null;
 function captureView(){const {role,uploadName,...view}=st;return {view,wall:document.body.classList.contains('wall'),y:window.scrollY||0}}
-function restoreView(saved){stop();Object.assign(st,saved.view);document.body.classList.toggle('wall',saved.wall);$('rail').classList.remove('open');$('menu').setAttribute('aria-expanded','false');render();$('main').focus({preventScroll:true});window.scrollTo(0,saved.y)}
+function returnControl(){
+ const el=document.activeElement;
+ if(!el?.matches('#main [data-act]'))return null;
+ const peers=[...$('main').querySelectorAll('[data-act]')].filter(b=>b.dataset.act===el.dataset.act && b.dataset.v===el.dataset.v);
+ return {act:el.dataset.act,value:el.dataset.v,index:peers.indexOf(el)};
+}
+function focusReturnControl(key){
+ const match=key && [...$('main').querySelectorAll('[data-act]')].filter(b=>b.dataset.act===key.act && b.dataset.v===key.value)[key.index];
+ (match && match.getClientRects().length && !match.disabled ? match : $('main')).focus({preventScroll:true});
+}
+function restoreView(saved){
+ stop();Object.assign(st,saved.view);document.body.classList.toggle('wall',saved.wall);
+ $('rail').classList.remove('open');$('menu').setAttribute('aria-expanded','false');render();
+ const tables=$('main').querySelectorAll('.scroll');
+ for(const [i,x] of saved.tableOffsets||[])if(tables[i])tables[i].scrollLeft=x;
+ focusReturnControl(saved.control);window.scrollTo(0,saved.y);
+ history.replaceState({...history.state,saved:{...saved,view:priorView.view}},'');
+}
 function nav(n){if(!Number.isInteger(n)||n<0||n>13)n=0;if(n!==st.page){
- const old={...(priorView||captureView()),y:window.scrollY||0};
+ const tableOffsets=Array.from($('main').querySelectorAll('.scroll'),(table,i)=>[i,table.scrollLeft]).filter(([,x])=>x!==0);
+ const old={...(priorView||captureView()),y:window.scrollY||0,control:returnControl(),tableOffsets};
  history.replaceState({...history.state,saved:old},'','#'+ids[st.page]);
  history.pushState({back:true},'','#'+ids[n]);
  }stop();st.page=n;$('rail').classList.remove('open');$('menu').setAttribute('aria-expanded','false');if(n!==0)document.body.classList.remove('wall');if(location.hash!=='#'+ids[n])location.hash=ids[n];render();window.scrollTo(0,0);$('main').focus({preventScroll:true})}
@@ -636,10 +654,7 @@ $('wall').onclick=()=>{const on=!document.body.classList.contains('wall');docume
 $('role').onchange=()=>{st.role=$('role').value;if($('dlg').open)$('dlg').close();render()};
 document.addEventListener('input',e=>{const k=e.target.id;if(['fields','objQ','mapQ','pkgQ'].includes(k)){st[k]=e.target.value;render()}if(k==='payload'){const had=!!staged;importText=e.target.value;staged=null;if(had)render()}if(k==='cursor'){stop();st.min=+e.target.value;render();$('cursor').focus({preventScroll:true})}});
 document.addEventListener('change',async e=>{const k=e.target.id;if(k==='pageJump'){const section=$(e.target.value);if(section){section.scrollIntoView({block:'start'});section.focus({preventScroll:true});e.target.value=''}return}if(k==='inspectionTerm'){st.inspectionTerm=e.target.value;render();return}if(k==='compareSite'||k==='compareDate'){st[k==='compareSite'?'natSite':'compareDate']=e.target.value;render();return}if(k==='upload'){const f=e.target.files[0];if(!f)return;if(f.size>200000||!f.name.toLowerCase().endsWith('.csv'))return msg('Выберите CSV размером до 200 кБ.');try{importText=new TextDecoder('utf-8',{fatal:true}).decode(await f.arrayBuffer());st.uploadName=f.name;staged=null;render()}catch{msg('Файл должен быть в кодировке UTF-8.')}return}if(['mapT','objT','measure','period','qc','pkgFilter','entity','natSite','basis','pkg','comparePkg','nuclide','resultKind','research','selectedCase','slot','container','speed','trip'].includes(k)){st[k]=['speed','trip'].includes(k)?+e.target.value:e.target.value;if(k==='trip'){stop();st.min=0}if(k==='entity')st.fields='';render()}});
-window.addEventListener('popstate',e=>{if(e.state?.saved)restoreView(e.state.saved);else {stop();document.addEventListener('keydown',e=>{
- if((e.ctrlKey||e.metaKey)&&e.code==='KeyK'&&!$('dlg').open){e.preventDefault();run('sections');return}
- if(e.key==='Escape'&&$('rail').classList.contains('open')){$('rail').classList.remove('open');$('menu').setAttribute('aria-expanded','false');$('menu').focus()}
-});
+window.addEventListener('popstate',e=>{if(e.state?.saved)restoreView(e.state.saved);else {stop();
 st.page=Math.max(0,ids.indexOf(location.hash.slice(1)));document.body.classList.toggle('wall',st.page===0);render()}});
 window.addEventListener('hashchange',()=>{let n=ids.indexOf(location.hash.slice(1));if(n!==st.page)nav(n)});
 const searchTopics=['видеостена показатели обзор','карта площадка вместимость наследие','реестр сооружение отходы','доза вода пункт наблюдение график','проверка аудит снимок журнал','словарь поле тип данных','тара коррозия пломба осмотр срок','перевозка контейнер рейс воспроизведение','запас прогноз сектор класс отчёт объём версия','приёмка запрос критерий','страна международный источник','паспорт упаковка радионуклид измерение','склад передача контейнер сверка получение','импорт CSV загрузка ошибка повтор'];
