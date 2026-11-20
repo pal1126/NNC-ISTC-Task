@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function inspectionFieldError' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function inspectionQueueShortcuts' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -188,7 +188,17 @@ with sync_playwright() as p:
         page.emulate_media(reduced_motion='no-preference')
         page.goto(url+'#packaging')
         page.locator('#pkgQ').fill('PKG-003')
-        page.locator('#inspectionTerm').select_option('Просрочен')
+        def shortcut(key):
+            return page.locator('[data-inspection-queue="'+key+'"]')
+        overdue, pending, returned = [shortcut(key) for key in ('Просрочен', 'На проверке', 'На доработке')]
+        assert [b.locator('strong').inner_text() for b in (overdue,pending,returned)] == ['1','0','0']
+        activate(pending)
+        assert pending.get_attribute('aria-pressed')=='true'
+        assert page.locator('table [data-act="inspection"]').count()==0
+        activate(pending)
+        assert pending.get_attribute('aria-pressed')=='false'
+        activate(overdue)
+        assert overdue.evaluate('el=>el===document.activeElement')
         opener=page.locator('table [data-act="inspection"][data-v="PKG-004"]')
         opener.scroll_into_view_if_needed()
         top=page.evaluate('scrollY')
@@ -227,7 +237,8 @@ with sync_playwright() as p:
         print('INSPECTION DATE VALIDATION',name,'PASS',flush=True)
         activate(page.locator('#entry button.primary'))
         page.locator('#dlg').wait_for(state='hidden')
-        page.locator('#inspectionTerm').select_option('На проверке')
+        assert pending.locator('strong').inner_text()=='1'
+        activate(pending)
         activate(opener)
         assert page.locator('#dlg h3').count()==2
         assert 'DEMO-TEST-CHECK' in page.locator('#dlg').inner_text()
@@ -240,7 +251,8 @@ with sync_playwright() as p:
         activate(page.locator('[data-act="inspectReturn"]'))
         page.locator('#ireason').fill('Уточните номер протокола.')
         activate(page.locator('#entry button.primary'))
-        page.locator('#inspectionTerm').select_option('На доработке')
+        assert returned.locator('strong').inner_text()=='1'
+        activate(returned)
         assert edit.is_disabled()
         page.locator('#role').select_option('edit')
         activate(edit)
@@ -275,6 +287,8 @@ with sync_playwright() as p:
         activate(page.locator('[data-act="inspectApprove"]'))
         print('REVIEW COMPARISON',name,'PASS',flush=True)
         assert review.count()==0
+        assert [b.locator('strong').inner_text() for b in (overdue,pending,returned)] == ['0','0','0']
+        print('QUEUE SHORTCUTS',name,'PASS',flush=True)
         page.locator('#inspectionTerm').select_option('Запланирован')
         activate(opener)
         assert 'DEMO-TEST-R2' in page.locator('#dlg').inner_text()
