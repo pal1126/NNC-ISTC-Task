@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'const returnedInspections=' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function inspectionCorrection' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -239,8 +239,25 @@ with sync_playwright() as p:
         page.locator('#inspectionTerm').select_option('На проверке')
         page.locator('#role').select_option('review')
         activate(review)
-        assert 'DEMO-TEST-R2' in page.locator('#dlg').inner_text()
+        comparison=page.locator('.inspection-correction')
+        assert 'Уточните номер протокола.' in comparison.inner_text()
+        assert comparison.locator('.inspection-change h4').all_text_contents()==['Протокол']
+        assert comparison.locator('.inspection-change dd').all_text_contents()==['DEMO-TEST-CHECK','DEMO-TEST-R2']
+        activate(page.locator('[data-act="inspectReturn"]'))
+        page.locator('#ireason').fill('Подтвердите редакцию.')
+        activate(page.locator('#entry button.primary'))
+        page.locator('#inspectionTerm').select_option('На доработке')
+        page.locator('#role').select_option('edit')
+        activate(edit)
+        activate(page.locator('#entry button.primary'))
+        page.locator('#inspectionTerm').select_option('На проверке')
+        page.locator('#role').select_option('review')
+        activate(review)
+        assert 'Подтвердите редакцию.' in comparison.inner_text()
+        assert 'без изменений' in comparison.inner_text()
+        assert comparison.locator('.inspection-change').count()==0
         activate(page.locator('[data-act="inspectApprove"]'))
+        print('REVIEW COMPARISON',name,'PASS',flush=True)
         assert review.count()==0
         page.locator('#inspectionTerm').select_option('Запланирован')
         activate(opener)
