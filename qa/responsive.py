@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function recordSearch' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function markCurrentRecord' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -29,7 +29,7 @@ with sync_playwright() as p:
                 operation()
                 print(name,label,'PASS',flush=True)
             except Exception as error:
-                print(name,label,'FAIL',str(error)[:500],flush=True)
+                raise AssertionError(f'{name} {label}') from error
         def home():
             page.goto(url)
             page.locator('.hq').wait_for()
@@ -138,6 +138,7 @@ with sync_playwright() as p:
             assert total>1
             box.fill(query)
             assert rows.count()==1 and rows.first.get_attribute('data-v')==wanted
+            assert rows.first.get_attribute('aria-pressed')=='true'
             box.fill(query+' xyz')
             assert rows.count()==0
             box.fill('')
@@ -152,7 +153,25 @@ with sync_playwright() as p:
             page.goto(url+'#'+route)
             page.locator('#main h1:visible').first.wait_for()
             g=geometry()
+            assert g['width']==w,(name,route,g)
+            if route!='overview':
+                title=page.locator('#main h1:visible').first.inner_text()
+                assert page.title().startswith(title)
+            if route=='objects':
+                wide=page.locator('#main .wide-table').first
+                if mobile and w<500:
+                    wide.wait_for()
+                    assert wide.get_attribute('tabindex')=='0'
+                    assert wide.locator('+ .table-help').is_visible()
+                if name=='tablet':
+                    menu=page.locator('#menu')
+                    activate(menu)
+                    assert page.locator('#nav a[aria-current]').is_visible()
+                    menu.press('Escape')
+                    assert menu.get_attribute('aria-expanded')=='false'
+            page.screenshot(path=str(out/(name+'-'+route+'.png')))
             print(name,route,g['viewport'],g['width'],g['overflow'],flush=True)
         print(name,'JS errors',errors,flush=True)
+        assert not errors, errors
         page.close()
     browser.close()
