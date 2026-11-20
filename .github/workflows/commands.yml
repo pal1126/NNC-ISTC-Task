@@ -1,0 +1,19 @@
+name: R3 command acceptance
+on:
+  push:
+    branches: [qa/r3-command-acceptance]
+permissions:
+  contents: read
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install playwright && python -m playwright install chromium
+      - run: python qa/commands.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: command-results
+          path: command-results.csv
+      - run: python -c "import csv; assert all(r['result']=='PASS' for r in csv.DictReader(open('command-results.csv',encoding='utf-8-sig')))"
