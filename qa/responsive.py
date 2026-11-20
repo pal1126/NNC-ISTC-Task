@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function markCurrentRecord' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function sectionSearchKeys' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -143,6 +143,27 @@ with sync_playwright() as p:
             assert rows.count()==0
             box.fill('')
             assert rows.count()==total
+        home()
+        activate(page.locator('[data-act="sections"]'))
+        query=page.locator('#sectionQuery')
+        query.fill('перевозок история')
+        query.press('ArrowDown')
+        assert page.locator('#sectionResults button:focus').count()==1
+        page.keyboard.press('ArrowUp')
+        assert query.evaluate('e=>e===document.activeElement')
+        query.press('Enter')
+        page.wait_for_url('**/#transport')
+        assert page.locator('h1:focus').inner_text()=='История перевозок'
+        back=page.locator('[data-act="previous"]:visible')
+        assert 'Сводная панель' in back.inner_text()
+        activate(back)
+        page.locator('.hq').wait_for()
+        assert page.locator('[data-act="sections"]:focus').count()==1
+        page.emulate_media(reduced_motion='reduce')
+        activate(page.locator('[data-act="siteCard"]'))
+        assert page.locator('#main').evaluate('e=>e.getAnimations().length')==0
+        page.emulate_media(reduced_motion='no-preference')
+        print('SECTION TRANSITIONS',name,'PASS',flush=True)
         print('REGISTER SEARCH',name,'PASS',flush=True)
         home()
         page.screenshot(path=str(out/(name+'.png')))
