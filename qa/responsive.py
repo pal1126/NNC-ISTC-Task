@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if "e.target.id==='sectionQuery'" in urlopen(url+'?check=wall-fit').read().decode():
+    if "r: 76px"  in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
