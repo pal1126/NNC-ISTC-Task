@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function inspectionCorrection' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function inspectionDecisionCell' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -264,6 +264,22 @@ with sync_playwright() as p:
         assert 'DEMO-TEST-R2' in page.locator('#dlg').inner_text()
         assert page.locator('#dlg h3').count()==1
         page.keyboard.press('Escape')
+        page.locator('#pkgQ').fill('PKG-004')
+        decisions=page.locator('.inspection-decision')
+        assert decisions.count()==3
+        for index,expected in enumerate(['Редакция 3 · Подтверждено','Редакция 2 · Возвращено на доработку','Редакция 1 · Возвращено на доработку']):
+            item=decisions.nth(index)
+            assert item.locator('summary').inner_text()==expected
+            activate(item.locator('summary'))
+            assert 'Время решения (UTC)' in item.inner_text()
+        assert 'без изменений' in decisions.nth(0).inner_text()
+        assert decisions.nth(1).locator('.inspection-change dd').all_text_contents()==['DEMO-TEST-CHECK','DEMO-TEST-R2']
+        assert 'Подтвердите редакцию.' in decisions.nth(1).inner_text()
+        assert 'Уточните номер протокола.' in decisions.nth(2).inner_text()
+        assert 'DEMO-TEST-R2' not in decisions.nth(2).inner_text()
+        page.locator('#pkgQ').fill('PKG-003')
+        assert decisions.count()==0
+        print('INSPECTION HISTORY',name,'PASS',flush=True)
         print('INSPECTION CORRECTION',name,'PASS',flush=True)
         print('INSPECTION QUEUE',name,'PASS',flush=True)
         print('SECTION TRANSITIONS',name,'PASS',flush=True)
