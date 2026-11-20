@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if "r: 76px"  in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function focusReturnControl' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -99,6 +99,32 @@ with sync_playwright() as p:
         assert opener.evaluate('e=>e===document.activeElement')
         home()
         print('FOCUS TOUCH SEARCH',name,'PASS',flush=True)
+        page.goto(url+'#map')
+        page.locator('#mapQ').fill('S-00')
+        activate(page.locator('[data-act="site"][data-v="S-003"]'))
+        link=page.locator('[data-act="siteObjects"][data-v="S-003"]')
+        link.scroll_into_view_if_needed()
+        # Emulate horizontal reading position only if the table overflows.
+        left=page.locator('.scroll').last.evaluate("e=>{e.scrollLeft=62;return e.scrollLeft}")
+        top=page.evaluate('scrollY')
+        activate(link)
+        page.wait_for_url('**/#objects')
+        assert page.locator('#objQ').input_value()=='S-003'
+        activate(page.locator('[data-act="previous"]'))
+        page.wait_for_url('**/#map')
+        def verify_return():
+            assert page.locator('#mapQ').input_value()=='S-00'
+            assert link.evaluate('e=>document.activeElement===e')
+            assert page.locator('.scroll').last.evaluate('e=>e.scrollLeft')==left
+            assert abs(page.evaluate('scrollY')-top)<=2
+        verify_return()
+        page.go_forward()
+        page.wait_for_url('**/#objects')
+        page.go_back()
+        page.wait_for_url('**/#map')
+        verify_return()
+        print('RETURN CONTEXT',name,'PASS',top,left,flush=True)
+        home()
         page.screenshot(path=str(out/(name+'.png')))
         print(name,'HOME',geometry(),flush=True)
         for label,flow in [('map-card-home',map_flow),('stock-filter',metric_flow),('search-navigation',sections_flow)]:
