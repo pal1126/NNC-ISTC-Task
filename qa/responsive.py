@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function inspectionDecisionCell' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function inspectionHistoryFile' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -277,6 +277,23 @@ with sync_playwright() as p:
         assert 'Подтвердите редакцию.' in decisions.nth(1).inner_text()
         assert 'Уточните номер протокола.' in decisions.nth(2).inner_text()
         assert 'DEMO-TEST-R2' not in decisions.nth(2).inner_text()
+        with page.expect_download() as event:
+            activate(page.locator('[data-inspection-export="PKG-004"]'))
+        downloaded=event.value
+        assert downloaded.suggested_filename=='Task1_PKG-004_inspection_history_RU.html'
+        offline=browser.new_context(offline=True,viewport={'width':w,'height':h})
+        copy=offline.new_page()
+        copy.goto(downloaded.path().as_uri())
+        assert copy.locator('html').get_attribute('lang')=='ru'
+        assert 'PKG-004' in copy.title()
+        assert copy.locator('article').count()==4
+        assert copy.locator('.inspection-decision[open]').count()==3
+        assert copy.locator('.inspection-decision summary').all_text_contents()==decisions.locator('summary').all_text_contents()
+        assert copy.locator('.inspection-decision').all_inner_texts()==decisions.all_inner_texts()
+        assert 'PKG-003' not in copy.locator('main').inner_text()
+        assert copy.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        offline.close()
+        print('OFFLINE INSPECTION EXPORT',name,'PASS',flush=True)
         page.locator('#pkgQ').fill('PKG-003')
         assert decisions.count()==0
         print('INSPECTION HISTORY',name,'PASS',flush=True)
