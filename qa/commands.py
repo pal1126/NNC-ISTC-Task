@@ -9,7 +9,7 @@ from urllib.request import urlopen
 
 URL = "https://pal1126.github.io/NNC-ISTC-Task/"
 source = urlopen(URL).read().decode()
-dispatcher = source.split('function run(act,v){')[1].split("document.addEventListener")[0]
+dispatcher = re.split(r'function run\(act,v(?:,trigger=null)?\)\{',source,maxsplit=1)[1].split("document.addEventListener")[0]
 expected = set(re.findall(r"act==='([^']+)'", dispatcher))
 for group in re.findall(r"\[([^\]]*)\]\.includes\(act\)", dispatcher):
     expected.update(re.findall(r"'([^']+)'", group))
