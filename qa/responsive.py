@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'max-height: 31vh' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'class="site-hit"' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -67,6 +67,38 @@ with sync_playwright() as p:
             if name=='wall':
                 assert g['height']<=h and all(0<=r[0] and 0<=r[1] and r[2]<=w+1 and r[3]<=h+1 for r in bounds)
         home()
+        picker=page.locator('[data-act="site"][data-v="S-002"]')
+        activate(picker)
+        assert picker.evaluate("e=>e===document.activeElement") and picker.get_attribute('aria-pressed')=='true'
+        pin=page.locator('[data-site="S-003"]')
+        if mobile:
+            assert picker.bounding_box()['height']>=44
+            circle=pin.locator('.site-hit')
+            point=circle.evaluate("""e=>{
+                const r=e.getBoundingClientRect(), x=r.x+r.width/2+19,y=r.y+r.height/2;
+                return [x,y,document.elementFromPoint(x,y)?.closest('[data-site]')?.dataset.site]
+            }""") if circle.is_visible() else None
+            if point is None or point[2]!='S-003':
+                circle.scroll_into_view_if_needed()
+                point=circle.evaluate("""e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2+19,y=r.y+r.height/2;return [x,y,document.elementFromPoint(x,y)?.closest('[data-site]')?.dataset.site]}""")
+            assert point[2]=='S-003',point
+            page.touchscreen.tap(*point[:2])
+        else:
+            pin.focus()
+            pin.press('Space')
+        assert pin.evaluate("e=>e===document.activeElement") and pin.get_attribute('aria-pressed')=='true'
+        opener=page.locator('[data-act="sections"]')
+        activate(opener)
+        page.locator('#sectionQuery').fill('перевозок   история')
+        result=page.locator('#sectionResults button').filter(has_text='История перевозок')
+        assert result.count()==1
+        page.locator('#sectionQuery').fill('яяянеизвестно')
+        assert page.locator('#sectionResults p').is_visible()
+        page.keyboard.press('Escape')
+        assert not page.locator('#dlg').is_visible()
+        assert opener.evaluate('e=>e===document.activeElement')
+        home()
+        print('FOCUS TOUCH SEARCH',name,'PASS',flush=True)
         page.screenshot(path=str(out/(name+'.png')))
         print(name,'HOME',geometry(),flush=True)
         for label,flow in [('map-card-home',map_flow),('stock-filter',metric_flow),('search-navigation',sections_flow)]:
