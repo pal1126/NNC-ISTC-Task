@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function openRegisterRecord' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function showInspectionSummary' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -186,6 +186,35 @@ with sync_playwright() as p:
         page.locator('.hq').wait_for()
         assert not page.locator('#dlg').is_visible()
         page.emulate_media(reduced_motion='no-preference')
+        page.goto(url+'#packaging')
+        page.locator('#pkgQ').fill('PKG-003')
+        page.locator('#inspectionTerm').select_option('Просрочен')
+        opener=page.locator('table [data-act="inspection"][data-v="PKG-004"]')
+        opener.scroll_into_view_if_needed()
+        top=page.evaluate('scrollY')
+        activate(opener)
+        assert 'Просрочен на 6 дн.' in page.locator('#dlg').inner_text()
+        assert not page.locator('#dlg h3').filter(has_text='Передано на проверку').count()
+        if mobile:
+            activate(page.locator('#dlg>form button'))
+        else:
+            page.keyboard.press('Escape')
+        assert opener.evaluate('el=>el===document.activeElement')
+        assert abs(page.evaluate('scrollY')-top)<=2
+        assert page.locator('#pkgQ').input_value()=='PKG-003'
+        assert page.locator('#inspectionTerm').input_value()=='Просрочен'
+        page.locator('#role').select_option('edit')
+        activate(page.locator('[data-act="inspectSubmit"][data-v="PKG-004"]'))
+        page.locator('#iaction').fill('Повторная проверка')
+        page.locator('#iref').fill('DEMO-TEST-CHECK')
+        activate(page.locator('#entry button.primary'))
+        page.locator('#inspectionTerm').select_option('На проверке')
+        activate(opener)
+        assert page.locator('#dlg h3').count()==2
+        assert 'DEMO-TEST-CHECK' in page.locator('#dlg').inner_text()
+        assert 'Просрочен на 6 дн.' in page.locator('#dlg').inner_text()
+        page.keyboard.press('Escape')
+        print('INSPECTION QUEUE',name,'PASS',flush=True)
         print('SECTION TRANSITIONS',name,'PASS',flush=True)
         print('REGISTER SEARCH',name,'PASS',flush=True)
         home()
