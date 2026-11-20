@@ -1,0 +1,22 @@
+name: Chromium responsive acceptance
+on:
+  push:
+    branches: [qa/r3-responsive-acceptance]
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install playwright && python -m playwright install chromium
+      - run: python qa/responsive.py | tee acceptance.log
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: responsive-evidence
+          path: |
+            evidence
+            acceptance.log
