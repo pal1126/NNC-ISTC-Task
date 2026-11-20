@@ -627,7 +627,7 @@ function run(act,v,trigger=null){
  render()
 }
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&!b.disabled){if(b.tagName==='A')e.preventDefault();run(b.dataset.act,b.dataset.v,b)}const s=e.target.closest('[data-site]');if(s)run('site',s.dataset.site,s);if(e.target.closest('#nav a')){e.preventDefault();nav(ids.indexOf(e.target.closest('a').hash.slice(1))) }});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('rail').classList.contains('open')){$('menu').click();$('menu').focus()}if(['Enter',' '].includes(e.key)&&e.target.hasAttribute('data-site')){e.preventDefault();run('site',e.target.dataset.site,e.target)}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape' && $('dlg').open && e.target.id==='sectionQuery'){e.preventDefault();$('dlg').close();return}if(e.key==='Escape'&&$('rail').classList.contains('open')){$('menu').click();$('menu').focus()}if(['Enter',' '].includes(e.key)&&e.target.hasAttribute('data-site')){e.preventDefault();run('site',e.target.dataset.site,e.target)}});
 $('menu').onclick=()=>{$('menu').setAttribute('aria-expanded',String($('rail').classList.toggle('open')))};
 $('wall').onclick=()=>{const on=!document.body.classList.contains('wall');document.body.classList.toggle('wall',on);if(on)nav(0);else render()};
 $('role').onchange=()=>{st.role=$('role').value;if($('dlg').open)$('dlg').close();render()};
