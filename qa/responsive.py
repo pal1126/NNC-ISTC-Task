@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function packageTripHistory' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'st.object=reloadView.view.object' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -196,6 +196,20 @@ with sync_playwright() as p:
                 assert not page.locator('#record-detail').count()
             box.fill('')
             assert rows.count()==total
+            if route in ('objects','packaging'):
+                query='F-00' if route=='objects' else 'PKG-00'
+                box.fill(query)
+                assert rows.count()>1
+                selected=rows.last.get_attribute('data-v')
+                activate(rows.last)
+                page.reload()
+                assert box.input_value()==query and selected in page.locator('#record-detail h2').inner_text()
+                assert rows.last.get_attribute('aria-pressed')=='true' and rows.last.get_attribute('data-v')==selected
+                box.fill('несуществующая запись')
+                page.reload()
+                assert rows.count()==0 and page.locator('#record-detail').count()==0
+                box.fill('')
+                print('REGISTER RELOAD SELECTION',name,route,'PASS',flush=True)
         home()
         activate(page.locator('[data-act="sections"]'))
         query=page.locator('#sectionQuery')
