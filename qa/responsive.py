@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'class="observation-point"' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'class="observation-key"' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -618,6 +618,17 @@ with sync_playwright() as p:
                 print('TRANSPORT NATIVE DRAG',name,'PASS',positions,flush=True)
                 print('TRANSPORT PLAYBACK FOCUS',name,'PASS',flush=True)
             if route=='monitor':
+                for media in ['screen','print']:
+                    page.emulate_media(media=media)
+                    assert page.locator('.observation-key').is_visible()
+                    for status,shape in [('Проверено','circle:not(.point-hit)'),('На проверке','rect')]:
+                        points=page.locator('.observation-point[aria-label$="'+status+'"]')
+                        assert points.count()>0 and points.locator(shape).count()==points.count()
+                        for mark in points.all():
+                            row=page.locator('tbody tr').filter(has_text=mark.get_attribute('data-v'))
+                            assert status in row.inner_text()
+                page.emulate_media(media='screen')
+                print('OBSERVATION STATUS SHAPES',name,'PASS',flush=True)
                 for station,mode,unit in [('P-001',False,'мкЗв/ч'),('P-002',True,'м')]:
                     page.locator('#measure').select_option(station)
                     page.locator('#period').select_option('early')
