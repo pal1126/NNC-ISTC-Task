@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function exportObservations' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'class="observation-point"' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -649,6 +649,19 @@ with sync_playwright() as p:
                             assert row['Режим отображения']==('С учётом поправок' if corrected else 'Исходные значения')
                             assert float(row['Значение на графике'])==float(expected)==float(value.replace(',','.'))
                     activate(page.locator('[data-act="corrected"]'))
+                    point=page.locator('.observation-point').last
+                    observation=point.get_attribute('data-v')
+                    assert observation in point.get_attribute('aria-label') and unit in point.get_attribute('aria-label')
+                    if mobile: activate(point.locator('.point-hit'))
+                    else:
+                        point.focus()
+                        point.press('Enter')
+                    dialog=page.locator('#dlg')
+                    assert dialog.is_visible() and observation in dialog.locator('h2').inner_text()
+                    assert 'DEMO-OBS-'+observation in dialog.inner_text() and station in dialog.inner_text()
+                    page.keyboard.press('Escape')
+                    assert not dialog.is_visible() and point.evaluate('e=>e===document.activeElement')
+                    print('OBSERVATION POINT DETAIL',name,station,'PASS',flush=True)
                     print('MONITOR CHART CSV',name,station,'PASS',flush=True)
                     print('MONITOR RELOAD',name,station,'PASS',flush=True)
                 page.locator('#measure').select_option('P-001')
