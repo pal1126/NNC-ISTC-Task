@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'const {trip,min,speed}=reloadView.view' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function packageTripHistory' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -221,6 +221,25 @@ with sync_playwright() as p:
         assert not page.locator('#dlg').is_visible()
         page.emulate_media(reduced_motion='no-preference')
         page.goto(url+'#packaging')
+        page.locator('#pkgQ').fill('PKG-003')
+        for pkg,trip,container in [('PKG-001','TR-001','CT-001'),('PKG-002','TR-001','CT-001'),('PKG-003','TR-002','SP-001'),('PKG-004',None,None)]:
+            page.locator('#pkgQ').fill(pkg)
+            detail=page.locator('#record-detail')
+            trip_link=detail.locator('[data-act="pkgTrip"]')
+            if trip is None:
+                assert trip_link.count()==0 and 'В журнале перевозок нет записей об этой упаковке.' in detail.inner_text()
+                continue
+            assert trip_link.inner_text()==trip+' · '+container
+            activate(trip_link)
+            page.wait_for_url('**/#transport')
+            assert page.locator('#trip option:checked').inner_text().startswith(trip+' · ')
+            assert page.locator('.map g').filter(has_text=container).count()==1
+            assert page.locator('[data-act="passport"][data-v="'+pkg+'"]').is_visible()
+            activate(page.locator('[data-act="previous"]').first)
+            page.wait_for_url('**/#packaging')
+            assert page.locator('#pkgQ').input_value()==pkg and pkg in detail.locator('h2').inner_text()
+            assert trip_link.evaluate('e=>e===document.activeElement')
+        print('PACKAGE TRIP ROUND TRIP',name,'PASS',flush=True)
         page.locator('#pkgQ').fill('PKG-003')
         def shortcut(key):
             return page.locator('[data-inspection-queue="'+key+'"]')
