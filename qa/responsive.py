@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function matchesDeclarationStatus' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'inventory-reconciliation' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -464,6 +464,28 @@ with sync_playwright() as p:
                     assert page.locator('#natSite').input_value()=='S-003'
                 page.evaluate("declarations.delete('S-001');render()")
                 page.locator('#natSite').select_option('')
+                import csv
+                from decimal import Decimal
+                reconciliation=page.locator('#inventory-reconciliation')
+                for basis in ['Фактический запас','Прогноз']:
+                    page.locator('#natSite').select_option('S-001')
+                    metric=page.locator('.metrics [data-act="basisBoard"][data-v="'+basis+'"]')
+                    total=Decimal(metric.locator('b').inner_text().split('м³')[0].replace(',','.').strip().replace('\u00a0',''))
+                    activate(metric)
+                    assert page.locator('#natSite').input_value()=='' and page.locator('#basis').input_value()==basis
+                    assert reconciliation.evaluate('e=>e===document.activeElement && e.getBoundingClientRect().top<innerHeight')
+                    ids=reconciliation.locator('[data-act="inventoryCard"]').all_text_contents()
+                    with page.expect_download() as event:
+                        activate(reconciliation.locator('[data-act="stockCsv"]'))
+                    with open(event.value.path(),encoding='utf-8-sig',newline='') as file:
+                        dialect=csv.Sniffer().sniff(file.readline(),delimiters=',;')
+                        file.seek(0)
+                        exported=list(csv.DictReader(file,dialect=dialect))
+                    assert [row['ID'] for row in exported]==ids and ids
+                    assert all(row['Основание']==basis for row in exported)
+                    assert sum(Decimal(row['Заявленный объём, м³'].replace(',','.')) for row in exported)==total
+                page.locator('#basis').select_option('')
+                print('NATIONAL VOLUME CSV',name,'PASS',flush=True)
                 print('NATIONAL REPORT TO MAP',name,'PASS',flush=True)
             if route in ['overview','map']:
                 legend=page.locator('.mapkey')
