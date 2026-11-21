@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'height:75mm!important' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function siteMarker' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -449,6 +449,27 @@ with sync_playwright() as p:
                     assert page.locator('#nav a[aria-current]').is_visible()
                     menu.press('Escape')
                     assert menu.get_attribute('aria-expanded')=='false'
+            if route in ['overview','map']:
+                legend=page.locator('.mapkey')
+                assert 'Нулевая декларация' in legend.inner_text()
+                page.evaluate("""() => {
+                    window.savedDeclaration=declarations.get('S-001');
+                    declarations.set('S-001',{kind:'zero',received:null});render();
+                }""")
+                for kind,shape,status in [('reported','circle','Сведения представлены'),('zero','path','нулевая декларация'),('missing','rect','Сведения не представлены')]:
+                    symbol=page.locator('.map [data-report-kind="'+kind+'"]').first
+                    assert symbol.evaluate('e=>e.localName')==shape
+                    pin=symbol.locator('..')
+                    assert status.lower() in pin.get_attribute('aria-label').lower()
+                    pin.focus()
+                    pin.press('Enter')
+                    assert pin.get_attribute('aria-pressed')=='true'
+                page.evaluate("""() => {
+                    if(window.savedDeclaration)declarations.set('S-001',window.savedDeclaration);
+                    else declarations.delete('S-001');
+                    render();
+                }""")
+                print('MAP DECLARATION SYMBOLS',name,route,'PASS',flush=True)
             page.locator('#main').focus()
             page.keyboard.press('Control+k')
             assert page.locator('#sectionQuery').evaluate('e=>e===document.activeElement')
@@ -472,6 +493,8 @@ with sync_playwright() as p:
             expected_title=page.title().split(' · ГИС учёта РАО')[0]
             if route in ['map','transport']:
                 assert 'КАЗАХСТАН' in ''.join(sheets[0].split()),(route,'map must appear on first sheet')
+            if route in ['map','overview']:
+                assert 'Нулевая декларация' in ' '.join(extracted.split())
             for number,sheet in enumerate(sheets,1):
                 lines=[' '.join(line.split()) for line in sheet.splitlines() if line.strip()]
                 assert expected_title in lines[0],(name,route,number,lines[:2])
