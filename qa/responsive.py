@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function preparePrintFilters' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'printPageHeading' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -464,7 +464,19 @@ with sync_playwright() as p:
             assert page.locator('.print-brand').is_visible()
             assert not page.locator('.mast').is_visible()
             assert not page.locator('.rail').is_visible()
-            if name=='wall' and route in ['packaging','overview']:
+            from subprocess import run
+            import re
+            extracted=run(['pdftotext','-layout','-','-'],input=data,capture_output=True,check=True).stdout.decode()
+            sheets=extracted.split('\f')
+            if not sheets[-1].strip(): sheets.pop()
+            expected_title=page.title().split(' · ГИС учёта РАО')[0]
+            for number,sheet in enumerate(sheets,1):
+                lines=[' '.join(line.split()) for line in sheet.splitlines() if line.strip()]
+                assert expected_title in lines[0],(name,route,number,lines[:2])
+                assert 'Демонстрационные данные' in lines[-1] and f'Стр. {number} из {len(sheets)}' in lines[-1],(route,number,lines[-2:])
+                assert len(' '.join(lines[1:-1]))>10,('empty sheet',route,number,lines)
+            print('PAGINATED',name,route,len(sheets),flush=True)
+            if name=='wall':
                 (out/(route+'-print.pdf')).write_bytes(data)
             page.emulate_media(media='screen')
             print('MODULE PRINT',name,route,'PASS',len(data),flush=True)
