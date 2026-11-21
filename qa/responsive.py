@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function inspectionQueueShortcuts' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function inspectionEmptyState' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -195,8 +195,22 @@ with sync_playwright() as p:
         activate(pending)
         assert pending.get_attribute('aria-pressed')=='true'
         assert page.locator('table [data-act="inspection"]').count()==0
+        empty=page.locator('.inspection-empty')
+        assert empty.get_by_role('status').inner_text()=='Нет записей, ожидающих проверки.'
+        activate(returned)
+        assert empty.get_by_role('status').inner_text()=='Нет записей, возвращённых на доработку.'
+        reset=empty.get_by_role('button',name='Показать все упаковки')
+        assert reset.bounding_box()['height']>=44
+        activate(reset)
+        assert not empty.count()
+        assert page.locator('#inspectionTerm').input_value()==''
+        assert page.locator('#inspectionTerm').evaluate('el=>el===document.activeElement')
+        assert page.locator('#pkgQ').input_value()=='PKG-003'
+        assert page.locator('table [data-act="inspection"]').count()>0
+        activate(pending)
         activate(pending)
         assert pending.get_attribute('aria-pressed')=='false'
+        print('EMPTY QUEUE RECOVERY',name,'PASS',flush=True)
         activate(overdue)
         assert overdue.evaluate('el=>el===document.activeElement')
         opener=page.locator('table [data-act="inspection"][data-v="PKG-004"]')
