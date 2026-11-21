@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'if(playbackButton)' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function pauseForSeek' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -495,6 +495,34 @@ with sync_playwright() as p:
                 assert advance.is_disabled() and cursor.evaluate('e=>document.activeElement===e')
                 cursor.press('Home')
                 assert cursor.get_attribute('aria-valuetext')=='00:00 UTC'
+                cursor.scroll_into_view_if_needed()
+                rect=cursor.bounding_box()
+                y=rect['y']+rect['height']/2
+                xs=[rect['x']+rect['width']*frac for frac in (.08,.32,.64,.999)]
+                cursor.evaluate('e=>window.seekSource=e')
+                if mobile:
+                    session=page.context.new_cdp_session(page)
+                    session.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':xs[0],'y':y}]})
+                else:
+                    page.mouse.move(xs[0],y)
+                    page.mouse.down()
+                positions=[]
+                for x in xs[1:]:
+                    if mobile: session.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x,'y':y}]})
+                    else: page.mouse.move(x,y,steps=3)
+                    assert cursor.evaluate('e=>e===window.seekSource')
+                    positions.append(int(cursor.input_value()))
+                    assert cursor.get_attribute('aria-valuetext')==page.locator('.time').inner_text()
+                if mobile:
+                    session.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
+                    session.detach()
+                else: page.mouse.up()
+                assert positions[0]<positions[1]<positions[2]==160,positions
+                assert cursor.get_attribute('aria-valuetext')=='02:40 UTC'
+                assert 'Прибытие. Ожидается приёмка' in page.locator('table strong').inner_text()
+                assert page.locator('[data-act="step"][data-v="1"]').is_disabled()
+                cursor.press('Home')
+                print('TRANSPORT NATIVE DRAG',name,'PASS',positions,flush=True)
                 print('TRANSPORT PLAYBACK FOCUS',name,'PASS',flush=True)
             if route=='national':
                 page.locator('#natSite').select_option('S-003')
