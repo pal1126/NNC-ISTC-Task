@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function inspectionReviewComparison' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function confirmedInspectionFields' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -365,6 +365,14 @@ with sync_playwright() as p:
         assert 'PKG-004' in copy.title()
         assert copy.locator('article').count()==4
         assert copy.locator('.inspection-decision[open]').count()==3
+        for history in [decisions,copy.locator('.inspection-decision')]:
+            for decision in history.all():
+                baseline=decision.locator('.inspection-baseline')
+                assert baseline.locator('dd').count()==4
+                assert baseline.locator('dd').nth(2).inner_text()=='14.11.2026'
+                assert '20.12.2026' in decision.inner_text()
+                assert 'DEMO-TEST-R2' not in baseline.inner_text()
+        print('REVIEW BASELINE HISTORY',name,'PASS',flush=True)
         assert copy.locator('.inspection-decision summary').all_text_contents()==decisions.locator('summary').all_text_contents()
         assert copy.locator('.inspection-decision').all_text_contents()==decisions.all_text_contents()
         assert 'PKG-003' not in copy.locator('main').inner_text()
