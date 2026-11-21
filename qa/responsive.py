@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'inspection-caption' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function inspectionDayText' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -227,6 +227,7 @@ with sync_playwright() as p:
             assert not captions.first.is_visible()
             assert inspection_list.locator('thead th').first.is_visible()
         print('INSPECTION ROW LAYOUT',name,'PASS',flush=True)
+        assert '14.11.2026' in inspection_list.inner_text()
         opener.scroll_into_view_if_needed()
         top=page.evaluate('scrollY')
         activate(opener)
@@ -269,6 +270,8 @@ with sync_playwright() as p:
         activate(opener)
         assert page.locator('#dlg h3').count()==2
         assert 'DEMO-TEST-CHECK' in page.locator('#dlg').inner_text()
+        assert '20.12.2026' in page.locator('#dlg').inner_text()
+        assert '14.11.2026' in page.locator('#dlg').inner_text()
         assert 'Просрочен на 6 дн.' in page.locator('#dlg').inner_text()
         page.keyboard.press('Escape')
         review=page.locator('[data-act="inspectReview"][data-v="PKG-004"]')
@@ -344,6 +347,11 @@ with sync_playwright() as p:
         downloaded.save_as(saved)
         copy.goto(saved.resolve().as_uri())
         assert copy.locator('html').get_attribute('lang')=='ru'
+        dates=[h.inner_text().split(' · ')[0] for h in copy.locator('article h2').all()]
+        from datetime import datetime
+        parsed=[datetime.strptime(day,'%d.%m.%Y') for day in dates]
+        assert parsed==sorted(parsed,reverse=True) and dates[0]=='20.11.2026'
+        print('RUSSIAN INSPECTION DATES',name,'PASS',flush=True)
         assert 'PKG-004' in copy.title()
         assert copy.locator('article').count()==4
         assert copy.locator('.inspection-decision[open]').count()==3
