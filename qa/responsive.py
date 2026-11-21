@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function exportTripHistory' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'const {trip,min,speed}=reloadView.view' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -542,7 +542,18 @@ with sync_playwright() as p:
                 cursor.press('Home')
                 for index in ['0','1']:
                     page.locator('#trip').select_option(index)
+                    page.locator('#speed').select_option('4')
+                    minute,utc,container=('90','01:30','CT-001') if index=='0' else ('20','00:20','SP-001')
+                    activate(page.locator('[data-act="at"][data-v="'+minute+'"]'))
                     expected=page.evaluate('currentTrip()')
+                    pin=page.locator('.map g').filter(has_text=container).locator('circle').last
+                    location=pin.evaluate("e=>[e.getAttribute('cx'),e.getAttribute('cy')]")
+                    page.reload()
+                    assert page.locator('#trip').input_value()==index and page.locator('#speed').input_value()=='4'
+                    assert cursor.get_attribute('aria-valuetext')==utc+' UTC' and play.inner_text()=='Воспроизвести'
+                    assert pin.evaluate("e=>[e.getAttribute('cx'),e.getAttribute('cy')]")==location
+                    assert gap.count()==(1 if index=='0' else 0)
+                    print('TRANSPORT RELOAD',name,expected['id'],'PASS',flush=True)
                     with page.expect_download() as download:
                         activate(page.get_by_role('button',name='Скачать историю в JSON'))
                     file=download.value
