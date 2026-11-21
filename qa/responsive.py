@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'st.object=reloadView.view.object' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'const {site,mapPins}=reloadView.view' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -146,6 +146,21 @@ with sync_playwright() as p:
         page.wait_for_url('**/#map')
         verify_return()
         print('RETURN CONTEXT',name,'PASS',top,left,flush=True)
+        pins=page.locator('[data-act="pins"]')
+        activate(pins)
+        page.reload()
+        assert pins.inner_text()=='Показать отметки' and page.locator('.map [data-site]').count()==0
+        assert page.locator('#mapQ').input_value()=='S-00' and link.is_visible()
+        activate(pins)
+        page.reload()
+        assert page.locator('.map [data-site="S-003"]').get_attribute('aria-pressed')=='true'
+        assert page.locator('table [data-act="site"][data-v="S-003"]').get_attribute('aria-pressed')=='true'
+        assert link.is_visible()
+        page.locator('#mapQ').fill('несуществующая площадка')
+        page.reload()
+        assert page.locator('.map [data-site]').count()==0 and not link.count()
+        assert page.get_by_text('По заданным условиям площадок нет.',exact=True).is_visible()
+        print('MAP RELOAD CONTEXT',name,'PASS',flush=True)
         home()
         for route,field,action,query,wanted in [
             ('map','mapQ','site','  площадка   S ‑ 003  Западная ','S-003'),
