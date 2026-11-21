@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function pageFromAddress' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function openSectionSearch' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -94,6 +94,15 @@ with sync_playwright() as p:
         assert result.count()==1
         page.locator('#sectionQuery').fill('яяянеизвестно')
         assert page.locator('#sectionResults p').is_visible()
+        assert page.locator('#sectionCount').inner_text()=='Найдено разделов: 0'
+        query=page.locator('#sectionQuery')
+        assert query.get_attribute('aria-describedby')=='sectionKeys'
+        query.press('Tab')
+        assert page.locator('#clearSectionQuery').evaluate('b=>b===document.activeElement')
+        page.keyboard.press('Enter')
+        assert query.evaluate('e=>e===document.activeElement') and query.input_value()==''
+        assert page.locator('#sectionCount').inner_text()=='Найдено разделов: 14'
+        assert page.locator('#sectionResults button').count()==14
         page.keyboard.press('Escape')
         assert not page.locator('#dlg').is_visible()
         assert opener.evaluate('e=>e===document.activeElement')
@@ -432,6 +441,15 @@ with sync_playwright() as p:
                     assert page.locator('#nav a[aria-current]').is_visible()
                     menu.press('Escape')
                     assert menu.get_attribute('aria-expanded')=='false'
+            page.locator('#main').focus()
+            page.keyboard.press('Control+k')
+            assert page.locator('#sectionQuery').evaluate('e=>e===document.activeElement')
+            page.keyboard.press('ArrowDown')
+            assert page.locator('#sectionResults button:focus').count()==1
+            page.keyboard.press('Escape')
+            assert not page.locator('#dlg').is_visible()
+            assert page.locator('#main').evaluate('e=>e===document.activeElement')
+            print('KEYBOARD ROUND TRIP',name,route,'PASS',flush=True)
             page.screenshot(path=str(out/(name+'-'+route+'.png')))
             print(name,route,g['viewport'],g['width'],g['overflow'],flush=True)
         print(name,'JS errors',errors,flush=True)
