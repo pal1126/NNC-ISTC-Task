@@ -1119,7 +1119,13 @@ function openSectionSearch(){
   $('sectionCount').textContent='Найдено разделов: '+results.querySelectorAll('button').length;
   clear.hidden=!input.value;
  }
- input.oninput=refresh;
+ let composing=false;
+ input.oncompositionstart=()=>{composing=true};
+ input.oncompositionend=()=>{composing=false;refresh()};
+ input.oninput=e=>{if(!composing&&!e.isComposing)refresh()};
+ input.onkeydown=e=>{
+  if(composing||e.isComposing||e.keyCode===229)e.stopPropagation();
+ };
  clear.onclick=()=>{input.value='';refresh();input.focus()};
  refresh();
  input.focus();
