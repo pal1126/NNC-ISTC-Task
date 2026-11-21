@@ -382,13 +382,20 @@ function inspectionDeadline(p){
  const days=(Date.parse(inspectionAsOf+'T00:00:00Z')-Date.parse(p.next+'T00:00:00Z'))/86400000;
  return '<span class="tag warn">Просрочен на '+days+' дн.</span>';
 }
+function inspectionDayText(value,empty='—'){
+ if(!value)return empty;
+ return esc(String(value).replace(/^(\d{4})-(\d{2})-(\d{2})$/,'$3.$2.$1'));
+}
+function inspectionFieldText(key,value){
+ return key==='day'||key==='next'?inspectionDayText(value):esc(value);
+}
 function showInspectionSummary(p){
  const pending=inspectionPending.get(p.id);
- const details=fact([['Дата осмотра',esc(p.last||'Нет данных')],['Состояние поверхности',esc(p.condition)],
-  ['Состояние пломбы',esc(p.seal)],['Протокол',esc(p.source)],['Следующий осмотр',esc(p.next||'Срок не указан')],
+ const details=fact([['Дата осмотра',inspectionDayText(p.last,'Нет данных')],['Состояние поверхности',esc(p.condition)],
+  ['Состояние пломбы',esc(p.seal)],['Протокол',esc(p.source)],['Следующий осмотр',inspectionDayText(p.next,'Срок не указан')],
   ['Статус на отчётную дату',inspectionDeadline(p)]]);
- const submitted=pending?'<h3>Передано на проверку</h3>'+fact([['Дата осмотра',esc(pending.day)],['Результат',esc(pending.result)],
-  ['Принятые меры',esc(pending.action)],['Предлагаемая дата следующего осмотра',esc(pending.next)],['Протокол',esc(pending.source)]]):'';
+ const submitted=pending?'<h3>Передано на проверку</h3>'+fact([['Дата осмотра',inspectionDayText(pending.day)],['Результат',esc(pending.result)],
+  ['Принятые меры',esc(pending.action)],['Предлагаемая дата следующего осмотра',inspectionDayText(pending.next)],['Протокол',esc(pending.source)]]):'';
  const returned=returnedInspections.get(p.id);
  const feedback=returned?'<h3>Возвращено на доработку</h3>'+fact([['Замечание проверяющего',esc(returned.reason)],['Протокол',esc(returned.source)]]):'';
  modal('Повторный осмотр · '+esc(p.id),'<div class="inspection-summary"><h3>Подтверждённые сведения</h3>'+details+submitted+feedback+'</div>');
@@ -422,7 +429,7 @@ function controlPanel(){
  const rows=wastePackages.filter(p=>matchesInspectionQueue(p,filter)).sort((a,b)=>(a.next||'9999').localeCompare(b.next||'9999')||a.id.localeCompare(b.id));
  return panel('Контроль повторных осмотров',note('Сроки по карточкам упаковок на 20.11.2026 · учебные данные.')+inspectionQueueShortcuts(filter)+
  filters(select('inspectionTerm','Показать',all(['Просрочен','Назначен на сегодня','Запланирован','Срок не указан','На проверке','На доработке']),filter))+
- (rows.length ? tbl(['Упаковка','Следующий осмотр','Срок','Последний подтверждённый результат','Документ','Действие'],rows.map(p=>[link(p.id,'inspection',p.id),esc(p.next||'—'),inspectionDeadline(p),esc(p.condition),link(esc(p.source),'evidence',p.source),inspectionPending.has(p.id)?btn('Проверить запись','inspectReview',p.id):btn(returnedInspections.has(p.id)?'Исправить запись':'Оформить повторный осмотр','inspectSubmit',p.id,st.role!=='edit')]),true) : inspectionEmptyState(filter)));
+ (rows.length ? tbl(['Упаковка','Следующий осмотр','Срок','Последний подтверждённый результат','Документ','Действие'],rows.map(p=>[link(p.id,'inspection',p.id),inspectionDayText(p.next),inspectionDeadline(p),esc(p.condition),link(esc(p.source),'evidence',p.source),inspectionPending.has(p.id)?btn('Проверить запись','inspectReview',p.id):btn(returnedInspections.has(p.id)?'Исправить запись':'Оформить повторный осмотр','inspectSubmit',p.id,st.role!=='edit')]),true) : inspectionEmptyState(filter)));
 }
 function inspectionDate(value){
  const iso=value.replace(/^(\d{2})\.(\d{2})\.(\d{4})$/,'$3-$2-$1');
@@ -471,7 +478,7 @@ function submitInspection(p){
   submission.correction={
    reason:draft.reason,
    changes:inspectionReviewFields.filter(([key])=>draft[key]!==submission[key])
-    .map(([key,label])=>({label,before:draft[key],after:submission[key]}))
+    .map(([key,label])=>({key,label,before:draft[key],after:submission[key]}))
   };
  }
  inspectionPending.set(p.id,submission);
@@ -483,14 +490,14 @@ const inspectionReviewFields=[['day','Дата осмотра'],['result','Ре�
 function inspectionCorrection(correction){
  if(!correction)return '';
  const changes=correction.changes.map(item=>'<div class="inspection-change"><h4>'+item.label+'</h4>'+
-  fact([['До доработки',esc(item.before)],['После доработки',esc(item.after)]])+'</div>').join('');
+  fact([['До доработки',inspectionFieldText(item.key,item.before)],['После доработки',inspectionFieldText(item.key,item.after)]])+'</div>').join('');
  return '<section class="inspection-correction"><h3>Повторная проверка</h3>'+
   fact([['Замечание при возврате',esc(correction.reason)]])+
   (changes||note('Запись повторно представлена без изменений.'))+'</section>';
 }
 function reviewInspection(p){
  const x=inspectionPending.get(p.id);if(!x)return;
- modal('Проверка повторного осмотра '+p.id,inspectionCorrection(x.correction)+fact(inspectionReviewFields.map(([key,label])=>[label,esc(x[key])]))+actions(btn('Подтвердить запись','inspectApprove',p.id,st.role!=='review'),btn('Вернуть с замечанием','inspectReturn',p.id,st.role!=='review')));
+ modal('Проверка повторного осмотра '+p.id,inspectionCorrection(x.correction)+fact(inspectionReviewFields.map(([key,label])=>[label,inspectionFieldText(key,x[key])]))+actions(btn('Подтвердить запись','inspectApprove',p.id,st.role!=='review'),btn('Вернуть с замечанием','inspectReturn',p.id,st.role!=='review')));
 }
 function approveInspection(p){
  const x=inspectionPending.get(p.id);if(st.role!=='review'||!x)return;
@@ -501,7 +508,7 @@ function approveInspection(p){
 }
 
 function pkgRows(){const matches=recordSearch(st.pkgQ);return wastePackages.filter(p=>(!st.pkgFilter||p.state===st.pkgFilter)&&matches([p.id,p.container,p.place]))}
-function pkgPage(){const rows=pkgRows();if(!rows.some(p=>p.id===st.pkg))st.pkg=rows[0]?.id||'';const p=chosen();return controlPanel()+filters(input('pkgQ','Упаковка, контейнер или место',st.pkgQ),select('pkgFilter','Размещение и перемещение',all([...new Set([...wastePackages.map(p=>p.state),st.pkgFilter].filter(Boolean))]),st.pkgFilter),btn('Выгрузить перечень','pkgCsv','',!rows.length))+panel('Журнал осмотров',registerSummary(rows.length,wastePackages.length)+tbl(['Упаковка','Контейнер','Размещение и перемещение','Дата осмотра по карточке','Следующий осмотр'],rows.map(p=>[link(p.id,'pickPkg',p.id),p.container||'—',tag(p.state),p.last,p.next])))+(p?panel('Осмотр '+p.id,recordBack('К журналу осмотров')+fact([['Состояние поверхности',p.condition],['Пломба',p.seal],['Дата осмотра',p.last],['Следующий осмотр',p.next],['Местоположение',esc(p.place)],['Документ',link(esc(p.source),'evidence',p.source)],['Примечание',esc(p.notes||'Замечаний нет')]])+actions(btn('Открыть паспорт','passport',p.id),...trips.flatMap((t,i)=>t.packs.includes(p.id)?[btn('История перевозки '+t.id,'pkgTrip',i)]:[]),btn('Внести запись осмотра','inspect',p.id,st.role!=='edit')),'record-detail')+inspectionsFor(p):'')}
+function pkgPage(){const rows=pkgRows();if(!rows.some(p=>p.id===st.pkg))st.pkg=rows[0]?.id||'';const p=chosen();return controlPanel()+filters(input('pkgQ','Упаковка, контейнер или место',st.pkgQ),select('pkgFilter','Размещение и перемещение',all([...new Set([...wastePackages.map(p=>p.state),st.pkgFilter].filter(Boolean))]),st.pkgFilter),btn('Выгрузить перечень','pkgCsv','',!rows.length))+panel('Журнал осмотров',registerSummary(rows.length,wastePackages.length)+tbl(['Упаковка','Контейнер','Размещение и перемещение','Дата осмотра по карточке','Следующий осмотр'],rows.map(p=>[link(p.id,'pickPkg',p.id),p.container||'—',tag(p.state),inspectionDayText(p.last),inspectionDayText(p.next)])))+(p?panel('Осмотр '+p.id,recordBack('К журналу осмотров')+fact([['Состояние поверхности',p.condition],['Пломба',p.seal],['Дата осмотра',inspectionDayText(p.last)],['Следующий осмотр',inspectionDayText(p.next)],['Местоположение',esc(p.place)],['Документ',link(esc(p.source),'evidence',p.source)],['Примечание',esc(p.notes||'Замечаний нет')]])+actions(btn('Открыть паспорт','passport',p.id),...trips.flatMap((t,i)=>t.packs.includes(p.id)?[btn('История перевозки '+t.id,'pkgTrip',i)]:[]),btn('Внести запись осмотра','inspect',p.id,st.role!=='edit')),'record-detail')+inspectionsFor(p):'')}
 const clockMin=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 function transport(){const t=currentTrip(),m=st.min,pts=t.pts.filter(p=>p[0]<=m),last=pts.at(-1),event=t.events.filter(e=>e[0]<=m).at(-1),next=t.pts.find(p=>p[0]>m),gap=next&&next[0]-last[0]>30&&m>last[0],unloaded=st.trip===1&&m>=30;const path=pts.slice(1).flatMap((p,i)=>p[0]-pts[i][0]<=30?[[pts[i].slice(1),p.slice(1)]]:[]);return filters(select('trip','Перевозка',trips.map((x,i)=>[i,x.id+' · '+x.kind]),st.trip),select('speed','Скорость',[1,2,4].map(v=>[v,v+'×']),st.speed),btn('Скачать историю','tripFile'))+'<div class="grid">'+panel('Положение контейнера '+t.container,geom([[t.container,'Последнее сообщение',last[1],last[2]]],t.container,path)+actions(btn(timer?'Пауза':'Воспроизвести','play'),btn('← Назад на шаг','step',-1,m===0),btn('На шаг вперёд →','step',1,m===t.pts.at(-1)[0]),'<label>Время <input class="range" type="range" id="cursor" aria-label="Время воспроизведения" min="0" max="'+t.pts.at(-1)[0]+'" value="'+m+'"></label>','<b class="time">'+clockMin(m)+' UTC</b>'))+panel('Состояние на выбранный момент',fact([['Дата','14.11.2026'],['Событие',tag(event[1])],['Последняя отметка',clockMin(last[0])+' UTC'],['Качество',gap?'Перерыв в поступлении данных':'Последняя доступная отметка'],['Упаковки',t.packs.map(id=>link(id,'passport',id)).join(' · ')],['Связь с контейнером',unloaded?'Завершена при выгрузке':'Действует с момента загрузки']])+note(unloaded?'После выгрузки положение упаковки определяется по её собственным событиям.':'Положение упаковки выводится по связи с контейнером. Между отметками координаты не вычисляются.'))+'</div>'+panel('События перевозки',note('Учебная перевозка. Время указано в UTC.')+tbl(['Время UTC','Событие','Просмотр'],t.events.map(e=>[clockMin(e[0]),e===event?'<strong>▶ '+e[1]+'</strong>':e[1],link('Перейти к событию','at',e[0])])))}
 // Учебные расчёты отделены от строк национального учёта.
@@ -617,11 +624,11 @@ function inspectionDecisionCell(entry,expanded=false){
  const fields=[['Решение',outcome],['Время решения (UTC)',entry.decidedAt.replace('T',' ').slice(0,19)]];
  if(entry.returnReason)fields.push(['Причина возврата',esc(entry.returnReason)]);
  return esc(entry.source)+'<details class="inspection-decision"'+(expanded?' open':'')+'><summary>Редакция '+x.revision+' · '+outcome+'</summary>'+
-  fact(fields)+fact(inspectionReviewFields.map(([key,label])=>[label,esc(x[key])]))+inspectionCorrection(x.correction)+'</details>';
+  fact(fields)+fact(inspectionReviewFields.map(([key,label])=>[label,inspectionFieldText(key,x[key])]))+inspectionCorrection(x.correction)+'</details>';
 }
 function inspectionHistoryFile(p,entries){
  const title='Хронология осмотров упаковки '+esc(p.id);
- const articles=entries.map(e=>'<article><h2>'+esc(e.day)+' · '+esc(e.scope)+'</h2>'+
+ const articles=entries.map(e=>'<article><h2>'+inspectionDayText(e.day)+' · '+esc(e.scope)+'</h2>'+
   fact([['Наблюдение',esc(e.finding)],['Последующие действия',esc(e.action)],['Документ',inspectionDecisionCell(e,true)]])+'</article>').join('');
  return '<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title>'+
   '<style>body{max-width:55rem;margin:auto;padding:1rem;font:1rem/1.5 system-ui,sans-serif;color:#16324a;overflow-wrap:anywhere}article{border-top:1px solid #a4b9c7;margin-top:1rem}dt{font-weight:600}dd{margin:0 0 .6rem}summary{font-weight:650}h2,h3,h4{break-after:avoid}</style>'+
@@ -630,7 +637,7 @@ function inspectionHistoryFile(p,entries){
 function inspectionEntries(id){return inspectionLog.filter(e=>e.pkg===id).sort((a,b)=>b.day.localeCompare(a.day))}
 function inspectionsFor(p){
  const entries=inspectionEntries(p.id);
- const table=tbl(['Дата','Область осмотра','Наблюдение','Последующие действия','Документ'],entries.map(e=>[esc(e.day),esc(e.scope),esc(e.finding),esc(e.action),inspectionDecisionCell(e)]));
+ const table=tbl(['Дата','Область осмотра','Наблюдение','Последующие действия','Документ'],entries.map(e=>[inspectionDayText(e.day),esc(e.scope),esc(e.finding),esc(e.action),inspectionDecisionCell(e)]));
  return panel('Хронология осмотров '+p.id,table+actions('<button type="button" data-inspection-export="'+esc(p.id)+'">Скачать историю осмотров (HTML)</button>',btn('Добавить запись в хронологию','addObservation',p.id,st.role!=='edit')));
 }
 
