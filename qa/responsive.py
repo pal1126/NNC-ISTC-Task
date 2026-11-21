@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'kz-public-waste' in urlopen(url+'?check=kz-public-waste').read().decode():
+    if 'const kzNationalEstimate=' in urlopen(url+'?check=kz-annual-comparison').read().decode():
         break
     sleep(5)
 else:
@@ -693,7 +693,11 @@ with sync_playwright() as p:
                 page.locator('#qc').select_option('')
             if route=='national':
                 public=page.locator('#kz-public-waste')
-                assert public.locator('tbody tr').count()==9
+                assert public.locator('tbody tr').all_text_contents()==['202319,9141,6','202425,8129,8','202513,8121,1']
+                assert public.locator('strong').all_text_contents()==['293 млн м³','290 млн м³']
+                assert public.locator('.scroll').evaluate('e=>e.scrollWidth<=e.clientWidth+1')
+                assert public.locator('a[href*="kazatomprom.kz"]').count()==1
+                print('KZ ANNUAL COMPARISON',name,'PASS',flush=True)
                 assert '120,69 тыс. т' in public.inner_text()
                 assert public.locator('a[href*="gov.kz"]').count()==1
                 import csv
