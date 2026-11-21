@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function openSectionSearch' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function preparePrintFilters' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -403,6 +403,14 @@ with sync_playwright() as p:
         page.goto(url+'#packaging')
         page.locator('#pkgQ').fill('PKG-003')
         page.locator('#inspectionTerm').select_option('Просрочен')
+        pdf=page.pdf(prefer_css_page_size=True)
+        assert pdf.startswith(b'%PDF-')
+        page.emulate_media(media='print')
+        for field,expected in [('pkgQ','PKG-003'),('inspectionTerm','Просрочен')]:
+            value=page.locator('#'+field).locator('..').locator('.print-value')
+            assert value.is_visible() and value.inner_text()==expected
+        page.emulate_media(media='screen')
+        assert not page.locator('.print-brand').is_visible()
         page.reload()
         assert page.locator('#pkgQ').input_value()=='PKG-003'
         assert page.locator('#inspectionTerm').input_value()=='Просрочен'
@@ -450,6 +458,16 @@ with sync_playwright() as p:
             assert not page.locator('#dlg').is_visible()
             assert page.locator('#main').evaluate('e=>e===document.activeElement')
             print('KEYBOARD ROUND TRIP',name,route,'PASS',flush=True)
+            page.emulate_media(media='print')
+            data=page.pdf(prefer_css_page_size=True)
+            assert data.startswith(b'%PDF-') and len(data)>5000
+            assert page.locator('.print-brand').is_visible()
+            assert not page.locator('.mast').is_visible()
+            assert not page.locator('.rail').is_visible()
+            if name=='wall' and route in ['packaging','overview']:
+                (out/(route+'-print.pdf')).write_bytes(data)
+            page.emulate_media(media='screen')
+            print('MODULE PRINT',name,route,'PASS',len(data),flush=True)
             page.screenshot(path=str(out/(name+'-'+route+'.png')))
             print(name,route,g['viewport'],g['width'],g['overflow'],flush=True)
         print(name,'JS errors',errors,flush=True)
