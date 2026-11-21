@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'printPageHeading' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'height:75mm!important' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -470,6 +470,8 @@ with sync_playwright() as p:
             sheets=extracted.split('\f')
             if not sheets[-1].strip(): sheets.pop()
             expected_title=page.title().split(' · ГИС учёта РАО')[0]
+            if route in ['map','transport']:
+                assert 'КАЗАХСТАН' in ''.join(sheets[0].split()),(route,'map must appear on first sheet')
             for number,sheet in enumerate(sheets,1):
                 lines=[' '.join(line.split()) for line in sheet.splitlines() if line.strip()]
                 assert expected_title in lines[0],(name,route,number,lines[:2])
