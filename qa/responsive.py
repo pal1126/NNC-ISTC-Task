@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if "input.addEventListener('compositionstart'" in urlopen(url+'?check=wall-fit').read().decode():
+    if 'if(playbackButton)' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -474,6 +474,28 @@ with sync_playwright() as p:
                     assert page.locator('#nav a[aria-current]').is_visible()
                     menu.press('Escape')
                     assert menu.get_attribute('aria-expanded')=='false'
+            if route=='transport':
+                play=page.locator('[data-act="play"]')
+                cursor=page.locator('#cursor')
+                play.focus()
+                if mobile: activate(play)
+                else: play.press('Enter')
+                page.wait_for_function("Number(document.querySelector('#cursor').value)>=2")
+                assert play.evaluate('e=>e===document.activeElement')
+                page.keyboard.press('Space')
+                assert play.inner_text()=='Воспроизвести'
+                cursor.focus()
+                cursor.press('End')
+                assert cursor.get_attribute('aria-valuetext')==page.locator('.time').inner_text()
+                assert page.locator('[data-act="step"][data-v="1"]').is_disabled()
+                cursor.press('ArrowLeft')
+                advance=page.locator('[data-act="step"][data-v="1"]')
+                advance.focus()
+                advance.press('Enter')
+                assert advance.is_disabled() and cursor.evaluate('e=>document.activeElement===e')
+                cursor.press('Home')
+                assert cursor.get_attribute('aria-valuetext')=='00:00 UTC'
+                print('TRANSPORT PLAYBACK FOCUS',name,'PASS',flush=True)
             if route=='national':
                 page.locator('#natSite').select_option('S-003')
                 page.evaluate("declarations.set('S-001',{kind:'zero',received:null});render()")
