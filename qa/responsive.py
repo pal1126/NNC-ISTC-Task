@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if "btn('Сбросить фильтры','basisBoard')"  in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function updateLiveSearch' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -145,7 +145,19 @@ with sync_playwright() as p:
             box.fill(' ')
             total=rows.count()
             assert total>1
-            box.fill(query)
+            box.focus()
+            box.evaluate("""(field, value)=>{
+                field.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));
+                field.value=value;
+                field.dispatchEvent(new InputEvent('input',{bubbles:true,isComposing:true}));
+                if(!field.isConnected)throw Error('Search field replaced during composition');
+            }""",query)
+            assert rows.count()==total
+            box.evaluate("""field=>field.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}))""")
+            assert rows.count()==1
+            box.evaluate("""field=>{field.setSelectionRange(1,4,'backward');render()}""")
+            assert box.evaluate('f=>[f===document.activeElement,f.selectionStart,f.selectionEnd,f.selectionDirection]')==[True,1,4,'backward']
+            print('SEARCH COMPOSITION',name,route,'PASS',flush=True)
             assert rows.count()==1 and rows.first.get_attribute('data-v')==wanted
             assert rows.first.get_attribute('aria-pressed')=='true'
             if route in ('objects','packaging'):
