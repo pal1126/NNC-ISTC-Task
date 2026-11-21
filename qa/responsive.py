@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function inventorySelectionNotice' in urlopen(url+'?check=wall-fit').read().decode():
+    if "btn('Сбросить фильтры','basisBoard')"  in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -471,7 +471,18 @@ with sync_playwright() as p:
                     section=page.locator('#inventory-reconciliation')
                     assert message in section.inner_text() and section.locator('[data-act="stockCsv"]').is_disabled()
                 page.evaluate("id=>{declarations.delete(id);render()}",empty_site)
-                page.locator('#natSite').select_option('')
+                page.locator('#basis').select_option('Прогноз')
+                reset=section.get_by_role('button',name='Сбросить фильтры')
+                if mobile:
+                    reset.tap()
+                else:
+                    reset.focus()
+                    reset.press('Enter')
+                assert section.evaluate('el=>el===document.activeElement')
+                assert page.locator('#natSite').input_value()==page.locator('#basis').input_value()==''
+                assert reset.count()==0 and section.locator('[data-act="stockCsv"]').is_enabled()
+                assert set(section.locator('[data-act="inventoryCard"]').all_text_contents())==set(page.evaluate('stock().map(o=>o.id)'))
+                print('RESET INVENTORY FILTERS',name,'PASS',flush=True)
                 assert 'Объём РАО неизвестен' not in page.locator('#inventory-reconciliation').inner_text()
                 print('EMPTY INVENTORY SELECTION',name,'PASS',flush=True)
                 import csv
