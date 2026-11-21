@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'На карте показано последнее известное положение контейнера.' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function exportTripHistory' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -540,6 +540,21 @@ with sync_playwright() as p:
                 check_marker(62.2,50.1)
                 assert lines.evaluate_all("els=>els.map(e=>e.getAttribute('d'))")==previous_lines and len(previous_lines)==2
                 cursor.press('Home')
+                for index in ['0','1']:
+                    page.locator('#trip').select_option(index)
+                    expected=page.evaluate('currentTrip()')
+                    with page.expect_download() as download:
+                        activate(page.get_by_role('button',name='Скачать историю в JSON'))
+                    file=download.value
+                    assert file.suggested_filename==expected['id']+'.json'
+                    saved=json.loads(Path(file.path()).read_text(encoding='utf-8'))
+                    meta=saved.pop('metadata')
+                    assert saved==expected
+                    assert meta['date']=='2026-11-14' and meta['timezone']=='UTC' and '14.11.2026' in page.locator('#main').inner_text()
+                    assert meta['pts_columns']==['Минута','Долгота (°)','Широта (°)'] and meta['events_columns']==['Минута','Событие']
+                    assert '00:00 UTC' in meta['time_unit'] and '30 минут' in meta['track_note'] and 'Демонстрационные' in meta['source']
+                page.locator('#trip').select_option('0')
+                print('TRANSPORT JSON EXPORT',name,'PASS',flush=True)
                 print('TRANSPORT MAP GAP',name,'PASS',flush=True)
                 print('TRANSPORT NATIVE DRAG',name,'PASS',positions,flush=True)
                 print('TRANSPORT PLAYBACK FOCUS',name,'PASS',flush=True)
