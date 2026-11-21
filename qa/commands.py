@@ -28,6 +28,7 @@ cases = """
 2|previous||st.page===1
 0|siteCard|'S-003'|st.page===1
 1|siteReport|'S-003'|st.natSite==='S-003' && st.page===8
+8|reportingMap|'missing'|st.page===1 && st.mapStatus==='missing' && document.querySelectorAll('table [data-act="site"]').length===3
 8|basisBoard|'Прогноз'|st.basis==='Прогноз'
 8|coverage||!!document.querySelector('#decls') && inView('decls')
 8|clearPageFilters||!st.natSite && !st.basis
