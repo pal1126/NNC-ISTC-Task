@@ -486,7 +486,8 @@ with sync_playwright() as p:
                     report=page.pdf(prefer_css_page_size=True)
                     from subprocess import run
                     report_text=' '.join(run(['pdftotext','-layout','-','-'],input=report,capture_output=True,check=True).stdout.decode().split())
-                    assert 'Статус отчётности Сведения не представлены' in report_text
+                    assert 'Статус отчётности' in report_text and 'Сведения не представлены' in report_text,report_text[:850]
+                    assert status.locator('..').locator('.print-value').text_content()=='Сведения не представлены'
                     status.select_option('zero')
                     assert pins.count()==0 and page.locator('table [data-act="site"]').count()==0
                     activate(page.locator('.panel [data-act="clearPageFilters"]'))
