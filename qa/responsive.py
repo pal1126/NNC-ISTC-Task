@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function siteMarker' in urlopen(url+'?check=wall-fit').read().decode():
+    if "select('mapStatus'" in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -469,6 +469,29 @@ with sync_playwright() as p:
                     else declarations.delete('S-001');
                     render();
                 }""")
+                if route=='map':
+                    status=page.locator('#mapStatus')
+                    status.select_option('missing')
+                    pins=page.locator('.map [data-site]')
+                    assert pins.count()==3
+                    assert all('Сведения не представлены' in p.get_attribute('aria-label') for p in pins.all())
+                    assert page.locator('table [data-act="site"]').count()==3
+                    page.locator('#mapQ').fill('S-001')
+                    assert pins.count()==1 and pins.first.get_attribute('data-site')=='S-001'
+                    activate(page.locator('[data-act="siteObjects"][data-v="S-001"]'))
+                    page.go_back()
+                    assert status.input_value()=='missing' and page.locator('#mapQ').input_value()=='S-001'
+                    page.reload()
+                    assert status.input_value()=='missing'
+                    report=page.pdf(prefer_css_page_size=True)
+                    from subprocess import run
+                    report_text=' '.join(run(['pdftotext','-layout','-','-'],input=report,capture_output=True,check=True).stdout.decode().split())
+                    assert 'Статус отчётности Сведения не представлены' in report_text
+                    status.select_option('zero')
+                    assert pins.count()==0 and page.locator('table [data-act="site"]').count()==0
+                    activate(page.locator('.panel [data-act="clearPageFilters"]'))
+                    assert pins.count()==4 and status.input_value()==''
+                    print('DECLARATION FILTER',name,'PASS',flush=True)
                 print('MAP DECLARATION SYMBOLS',name,route,'PASS',flush=True)
             page.locator('#main').focus()
             page.keyboard.press('Control+k')
