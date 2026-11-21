@@ -1216,6 +1216,11 @@ document.addEventListener('keydown',e=>{
 st.page=pageFromAddress();
 const reloadView=history.state?.saved;
 if(reloadView?.view?.page===st.page){
+ if(st.page===1){
+  const {site,mapPins}=reloadView.view;
+  if(typeof site==='string')st.site=site;
+  if(typeof mapPins==='boolean')st.mapPins=mapPins;
+ }
  if(st.page===2&&typeof reloadView.view.object==='string')st.object=reloadView.view.object;
  if(st.page===6&&typeof reloadView.view.pkg==='string')st.pkg=reloadView.view.pkg;
  if(st.page===7){
