@@ -1221,6 +1221,11 @@ if(reloadView?.view?.page===st.page){
   if(typeof site==='string')st.site=site;
   if(typeof mapPins==='boolean')st.mapPins=mapPins;
  }
+ if(st.page===3){
+  const {measure,showCorrected}=reloadView.view;
+  if(Object.hasOwn(stationParameters,measure))st.measure=measure;
+  if(typeof showCorrected==='boolean')st.showCorrected=showCorrected;
+ }
  if(st.page===2&&typeof reloadView.view.object==='string')st.object=reloadView.view.object;
  if(st.page===6&&typeof reloadView.view.pkg==='string')st.pkg=reloadView.view.pkg;
  if(st.page===7){
