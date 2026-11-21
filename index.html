@@ -978,9 +978,31 @@ $('wall').onclick=()=>{const on=!document.body.classList.contains('wall');docume
 $('role').onchange=()=>{st.role=$('role').value;if($('dlg').open)$('dlg').close();render()};
 document.addEventListener('input',e=>{const k=e.target.id;if(['fields','objQ','mapQ','pkgQ'].includes(k)){st[k]=e.target.value;render()}if(k==='payload'){const had=!!staged;importText=e.target.value;staged=null;if(had)render()}if(k==='cursor'){stop();st.min=+e.target.value;render();$('cursor').focus({preventScroll:true})}});
 document.addEventListener('change',async e=>{const k=e.target.id;if(k==='pageJump'){const section=$(e.target.value);if(section){section.scrollIntoView({block:'start'});section.focus({preventScroll:true});e.target.value=''}return}if(k==='inspectionTerm'){st.inspectionTerm=e.target.value;render();return}if(k==='compareSite'||k==='compareDate'){st[k==='compareSite'?'natSite':'compareDate']=e.target.value;render();return}if(k==='upload'){const f=e.target.files[0];if(!f)return;if(f.size>200000||!f.name.toLowerCase().endsWith('.csv'))return msg('Выберите CSV размером до 200 кБ.');try{importText=new TextDecoder('utf-8',{fatal:true}).decode(await f.arrayBuffer());st.uploadName=f.name;staged=null;render()}catch{msg('Файл должен быть в кодировке UTF-8.')}return}if(['mapT','objT','measure','period','qc','pkgFilter','entity','natSite','basis','pkg','comparePkg','nuclide','resultKind','research','selectedCase','slot','container','speed','trip'].includes(k)){st[k]=['speed','trip'].includes(k)?+e.target.value:e.target.value;if(k==='trip'){stop();st.min=0}if(k==='entity')st.fields='';render()}});
-window.addEventListener('popstate',e=>{if(e.state?.saved)restoreView(e.state.saved);else {stop();
-st.page=Math.max(0,ids.indexOf(location.hash.slice(1)));document.body.classList.toggle('wall',st.page===0);render()}});
-window.addEventListener('hashchange',()=>{let n=ids.indexOf(location.hash.slice(1));if(n!==st.page)nav(n)});
+function pageFromAddress(){
+ const route=ids.indexOf(location.hash.slice(1));
+ if(route>=0)return route;
+ if(location.hash)history.replaceState(null,'','#'+ids[0]);
+ return 0;
+}
+function openAddress(){
+ endSectionTransition();
+ stop();
+ if($('dlg').open)$('dlg').close();
+ $('rail').classList.remove('open');
+ $('menu').setAttribute('aria-expanded','false');
+ st.page=pageFromAddress();
+ document.body.classList.toggle('wall',st.page===0);
+ render();
+ window.scrollTo(0,0);
+ enterSection();
+}
+window.addEventListener('popstate',e=>{
+ if(e.state?.saved?.view?.page===ids.indexOf(location.hash.slice(1)))restoreView(e.state.saved);
+ else openAddress();
+});
+window.addEventListener('hashchange',()=>{
+ if(pageFromAddress()!==st.page)openAddress();
+});
 const searchTopics=['видеостена показатели обзор','карта площадка вместимость наследие','реестр сооружение отходы','доза вода пункт наблюдение график','проверка аудит снимок журнал','словарь поле тип данных','тара коррозия пломба осмотр срок','перевозка контейнер рейс воспроизведение','запас прогноз сектор класс отчёт объём версия','приёмка запрос критерий','страна международный источник','паспорт упаковка радионуклид измерение','склад передача контейнер сверка получение','импорт CSV загрузка ошибка повтор'];
 const filterDefaults={
  1:{mapQ:'',mapT:''},2:{objQ:'',objT:''},3:{period:'all',qc:''},5:{fields:''},6:{pkgQ:'',pkgFilter:'',inspectionTerm:''},8:{natSite:'',basis:'',compareDate:'31.10.2025'},10:{research:''},11:{comparePkg:'',nuclide:'',resultKind:''}
@@ -1038,6 +1060,14 @@ document.addEventListener('keydown',e=>{
  if((e.ctrlKey||e.metaKey)&&e.code==='KeyK'&&!$('dlg').open){e.preventDefault();run('sections');return}
  if(e.key==='Escape'&&$('rail').classList.contains('open')){$('rail').classList.remove('open');$('menu').setAttribute('aria-expanded','false');$('menu').focus()}
 });
-st.page=Math.max(0,ids.indexOf(location.hash.slice(1)));document.body.classList.toggle('wall',st.page===0);render();
+st.page=pageFromAddress();
+const reloadView=history.state?.saved;
+if(reloadView?.view?.page===st.page){
+ for(const key of Object.keys(filterDefaults[st.page]||{})){
+  if(typeof reloadView.view[key]==='string')st[key]=reloadView.view[key];
+ }
+}
+document.body.classList.toggle('wall',st.page===0&&(reloadView?.view?.page!==0||reloadView.wall));
+render();
 
 </script></body></html>
