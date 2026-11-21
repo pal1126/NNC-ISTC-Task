@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'const {measure,showCorrected}=reloadView.view' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function exportObservations' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -633,6 +633,23 @@ with sync_playwright() as p:
                     label='Показать исходные значения' if mode else 'Показать с учётом поправок'
                     assert page.locator('[data-act="corrected"]').inner_text()==label
                     assert rows.all_inner_texts()==before and page.locator('.obsstats').inner_text()==summary
+                    import csv
+                    for corrected in [mode,not mode]:
+                        if corrected!=mode: activate(page.locator('[data-act="corrected"]'))
+                        with page.expect_download() as event:
+                            activate(page.locator('[data-act="measCsv"]'))
+                        with open(event.value.path(),encoding='utf-8-sig',newline='') as file:
+                            data=list(csv.DictReader(file))
+                        assert [r['ID'] for r in data]==rows.locator('td:first-child').all_inner_texts()
+                        values=page.locator('svg[aria-label="Измерения по датам"] text[fill="white"]').all_text_contents()
+                        assert len(values)==len(data)
+                        for row,value in zip(data,values):
+                            expected=(row['Уточнённое'] or row['Исходное']) if corrected else row['Исходное']
+                            assert row['Пункт']==station and row['Единица']==unit and row['Статус проверки']=='Проверено'
+                            assert row['Режим отображения']==('С учётом поправок' if corrected else 'Исходные значения')
+                            assert float(row['Значение на графике'])==float(expected)==float(value.replace(',','.'))
+                    activate(page.locator('[data-act="corrected"]'))
+                    print('MONITOR CHART CSV',name,station,'PASS',flush=True)
                     print('MONITOR RELOAD',name,station,'PASS',flush=True)
                 page.locator('#measure').select_option('P-001')
                 page.locator('#period').select_option('all')
