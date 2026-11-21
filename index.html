@@ -1211,6 +1211,14 @@ document.addEventListener('keydown',e=>{
 st.page=pageFromAddress();
 const reloadView=history.state?.saved;
 if(reloadView?.view?.page===st.page){
+ if(st.page===7){
+  const {trip,min,speed}=reloadView.view;
+  if(Number.isInteger(trip)&&trips[trip]){
+   st.trip=trip;
+   if(Number.isInteger(min))st.min=Math.max(0,Math.min(min,currentTrip().pts.at(-1)[0]));
+  }
+  if([1,2,4].includes(speed))st.speed=speed;
+ }
  for(const key of Object.keys(filterDefaults[st.page]||{})){
   if(typeof reloadView.view[key]==='string')st[key]=reloadView.view[key];
  }
