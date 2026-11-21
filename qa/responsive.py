@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if "select('mapStatus'" in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function matchesDeclarationStatus' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -449,6 +449,22 @@ with sync_playwright() as p:
                     assert page.locator('#nav a[aria-current]').is_visible()
                     menu.press('Escape')
                     assert menu.get_attribute('aria-expanded')=='false'
+            if route=='national':
+                page.locator('#natSite').select_option('S-003')
+                page.evaluate("declarations.set('S-001',{kind:'zero',received:null});render()")
+                for status_key,expected in [('submitted',{'S-001','S-003'}),('missing',{'S-002','S-004'})]:
+                    indicator=page.locator('[data-act="reportingMap"][data-v="'+status_key+'"]')
+                    assert indicator.locator('b').inner_text().split(' / ')[0]==str(len(expected))
+                    activate(indicator)
+                    page.wait_for_url('**/#map')
+                    assert page.locator('#mapStatus').input_value()==status_key
+                    assert set(page.locator('table [data-act="site"]').all_text_contents())==expected
+                    assert page.locator('.map [data-site]').count()==len(expected)
+                    page.go_back()
+                    assert page.locator('#natSite').input_value()=='S-003'
+                page.evaluate("declarations.delete('S-001');render()")
+                page.locator('#natSite').select_option('')
+                print('NATIONAL REPORT TO MAP',name,'PASS',flush=True)
             if route in ['overview','map']:
                 legend=page.locator('.mapkey')
                 assert 'Нулевая декларация' in legend.inner_text()
