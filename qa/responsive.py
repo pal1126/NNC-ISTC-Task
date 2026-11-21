@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function inspectionDayText' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function inspectionReviewComparison' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -278,6 +278,16 @@ with sync_playwright() as p:
         edit=page.locator('[data-act="inspectSubmit"][data-v="PKG-004"]')
         page.locator('#role').select_option('review')
         activate(review)
+        comparison_table=page.locator('.inspection-review-table')
+        assert comparison_table.locator('tbody tr').count()==4
+        next_row=comparison_table.get_by_role('rowheader',name='Следующий осмотр').locator('..')
+        assert '14.11.2026' in next_row.locator('td').nth(0).inner_text()
+        assert '20.12.2026' in next_row.locator('td').nth(1).inner_text()
+        assert 'DEMO-TEST-CHECK' in comparison_table.locator('tbody tr').last.locator('td').last.inner_text()
+        assert 'Повторная проверка' in page.locator('#dlg dd').all_text_contents()
+        assert comparison_table.locator('td small').first.is_visible()==(name=='phone')
+        assert page.locator('#dlg').evaluate('e=>e.scrollWidth<=e.clientWidth+1')
+        print('CONFIRMED AND SUBMITTED',name,'PASS',flush=True)
         activate(page.locator('[data-act="inspectReturn"]'))
         page.locator('#ireason').fill('Уточните номер протокола.')
         activate(page.locator('#entry button.primary'))
