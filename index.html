@@ -97,6 +97,14 @@ button:active:not(:disabled){border-color:var(--ice)}
 .inspection-correction{margin:12px 0 18px;padding:12px;border-left:3px solid #69c6f6;background:#112d43}.inspection-correction h3,.inspection-change h4{margin:0 0 8px}.inspection-change{border-top:1px solid #34516a;padding-top:8px;margin-top:10px}.inspection-change dd{overflow-wrap:anywhere}
 .inspection-decision{min-width:12rem;max-width:32rem}.inspection-decision summary{padding:.4rem 0}.inspection-decision .facts{margin:.65rem 0}.inspection-decision[open]{white-space:normal}
 .inspection-field-error{color:#ffd497;line-height:1.4}.form [aria-invalid="true"]{border-color:#eca956}
+.inspection-review-table{width:100%;border-collapse:collapse;table-layout:fixed}.inspection-review-table caption{text-align:left;font-weight:650;padding:.8rem 0}.inspection-review-table td,.inspection-review-table th{overflow-wrap:anywhere}.inspection-review-table small{display:none}
+@media(max-width:640px){
+ .inspection-review-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .inspection-review-table,.inspection-review-table tbody,.inspection-review-table caption{display:block}
+ .inspection-review-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .inspection-review-table th[scope=row]{grid-column:1/-1;border:0;padding-bottom:0}
+ .inspection-review-table small{display:block;color:#b6cedd;margin-bottom:.2rem}
+}
 .inspection-caption{display:none}
 @media screen and (max-width:640px){
  .inspection-list table,.inspection-list tbody{display:block;min-width:0;width:100%}
@@ -495,9 +503,18 @@ function inspectionCorrection(correction){
   fact([['Замечание при возврате',esc(correction.reason)]])+
   (changes||note('Запись повторно представлена без изменений.'))+'</section>';
 }
+function inspectionReviewComparison(p,submission){
+ const confirmed={day:p.last,result:p.condition,next:p.next,source:p.source};
+ const rows=inspectionReviewFields.filter(([key])=>key in confirmed).map(([key,label])=>
+  '<tr><th scope="row">'+label+'</th><td><small>Подтверждено</small>'+inspectionFieldText(key,confirmed[key])+
+  '</td><td><small>На проверке</small>'+inspectionFieldText(key,submission[key])+'</td></tr>').join('');
+ return '<table class="inspection-review-table"><caption>Сопоставление с последним подтверждённым осмотром</caption>'+
+  '<thead><tr><th scope="col">Сведения об осмотре</th><th scope="col">Подтверждено</th><th scope="col">На проверке</th></tr></thead>'+
+  '<tbody>'+rows+'</tbody></table>'+fact([['Принятые меры при повторном осмотре',esc(submission.action)]]);
+}
 function reviewInspection(p){
  const x=inspectionPending.get(p.id);if(!x)return;
- modal('Проверка повторного осмотра '+p.id,inspectionCorrection(x.correction)+fact(inspectionReviewFields.map(([key,label])=>[label,inspectionFieldText(key,x[key])]))+actions(btn('Подтвердить запись','inspectApprove',p.id,st.role!=='review'),btn('Вернуть с замечанием','inspectReturn',p.id,st.role!=='review')));
+ modal('Проверка повторного осмотра '+p.id,inspectionCorrection(x.correction)+inspectionReviewComparison(p,x)+actions(btn('Подтвердить запись','inspectApprove',p.id,st.role!=='review'),btn('Вернуть с замечанием','inspectReturn',p.id,st.role!=='review')));
 }
 function approveInspection(p){
  const x=inspectionPending.get(p.id);if(st.role!=='review'||!x)return;
