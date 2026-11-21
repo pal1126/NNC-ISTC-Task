@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'class="observation-key"' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'Показать все наблюдения этого пункта' in urlopen(url+'?check=monitor-recovery').read().decode():
         break
     sleep(5)
 else:
@@ -629,6 +629,19 @@ with sync_playwright() as p:
                             assert status in row.inner_text()
                 page.emulate_media(media='screen')
                 print('OBSERVATION STATUS SHAPES',name,'PASS',flush=True)
+                page.locator('#measure').select_option('P-002')
+                page.locator('#period').select_option('late')
+                page.locator('#qc').select_option('На проверке')
+                export_button=page.locator('[data-act="measCsv"]')
+                mode_label=page.locator('[data-act="corrected"]').inner_text()
+                assert export_button.is_disabled() and page.locator('.observation-point').count()==0
+                activate(page.get_by_role('button',name='Показать все наблюдения этого пункта'))
+                assert page.locator('#measure').input_value()=='P-002'
+                assert page.locator('#period').input_value()=='all' and page.locator('#qc').input_value()==''
+                assert page.locator('[data-act="corrected"]').inner_text()==mode_label
+                assert page.locator('#main tbody td:first-child').all_inner_texts()==['M-007','M-008']
+                assert page.locator('.observation-point').count()==2 and export_button.is_enabled()
+                print('MONITOR EMPTY RECOVERY',name,'PASS',flush=True)
                 for station,mode,unit in [('P-001',False,'мкЗв/ч'),('P-002',True,'м')]:
                     page.locator('#measure').select_option(station)
                     page.locator('#period').select_option('early')
