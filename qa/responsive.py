@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'const {site,mapPins}=reloadView.view' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'const {measure,showCorrected}=reloadView.view' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -617,6 +617,26 @@ with sync_playwright() as p:
                 print('TRANSPORT MAP GAP',name,'PASS',flush=True)
                 print('TRANSPORT NATIVE DRAG',name,'PASS',positions,flush=True)
                 print('TRANSPORT PLAYBACK FOCUS',name,'PASS',flush=True)
+            if route=='monitor':
+                for station,mode,unit in [('P-001',False,'мкЗв/ч'),('P-002',True,'м')]:
+                    page.locator('#measure').select_option(station)
+                    page.locator('#period').select_option('early')
+                    page.locator('#qc').select_option('Проверено')
+                    activate(page.locator('[data-act="corrected"]'))
+                    rows=page.locator('#main tbody tr')
+                    before=rows.all_inner_texts()
+                    summary=page.locator('.obsstats').inner_text()
+                    assert before and all(r.locator('td').nth(4).inner_text()==unit for r in rows.all())
+                    page.reload()
+                    assert page.locator('#measure').input_value()==station
+                    assert page.locator('#period').input_value()=='early' and page.locator('#qc').input_value()=='Проверено'
+                    label='Показать исходные значения' if mode else 'Показать с учётом поправок'
+                    assert page.locator('[data-act="corrected"]').inner_text()==label
+                    assert rows.all_inner_texts()==before and page.locator('.obsstats').inner_text()==summary
+                    print('MONITOR RELOAD',name,station,'PASS',flush=True)
+                page.locator('#measure').select_option('P-001')
+                page.locator('#period').select_option('all')
+                page.locator('#qc').select_option('')
             if route=='national':
                 page.locator('#natSite').select_option('S-003')
                 page.evaluate("declarations.set('S-001',{kind:'zero',received:null});render()")
