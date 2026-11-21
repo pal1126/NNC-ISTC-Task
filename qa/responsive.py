@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'Показать все наблюдения этого пункта' in urlopen(url+'?check=monitor-recovery').read().decode():
+    if 'kz-public-waste' in urlopen(url+'?check=kz-public-waste').read().decode():
         break
     sleep(5)
 else:
@@ -692,6 +692,18 @@ with sync_playwright() as p:
                 page.locator('#period').select_option('all')
                 page.locator('#qc').select_option('')
             if route=='national':
+                public=page.locator('#kz-public-waste')
+                assert public.locator('tbody tr').count()==9
+                assert '120,69 тыс. т' in public.inner_text()
+                assert public.locator('a[href*="gov.kz"]').count()==1
+                import csv
+                with page.expect_download() as event:
+                    activate(public.locator('[data-act="kzPublicCsv"]'))
+                with open(event.value.path(),encoding='utf-8-sig',newline='') as handle:
+                    records=list(csv.DictReader(handle))
+                assert [row['Значение'] for row in records]==['293','290','19.9','141.6','25.8','129.8','13.8','121.1','120.69']
+                assert all(row['Источник'].startswith('https://') and row['Дата сверки']=='2026-11-21' for row in records)
+                print('KZ PUBLIC DATA CSV',name,'PASS',flush=True)
                 page.locator('#natSite').select_option('S-003')
                 page.evaluate("declarations.set('S-001',{kind:'zero',received:null});render()")
                 for status_key,expected in [('submitted',{'S-001','S-003'}),('missing',{'S-002','S-004'})]:
