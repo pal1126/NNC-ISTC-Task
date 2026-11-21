@@ -503,8 +503,11 @@ function inspectionCorrection(correction){
   fact([['Замечание при возврате',esc(correction.reason)]])+
   (changes||note('Запись повторно представлена без изменений.'))+'</section>';
 }
+function confirmedInspectionFields(p){
+ return {day:p.last,result:p.condition,next:p.next,source:p.source};
+}
 function inspectionReviewComparison(p,submission){
- const confirmed={day:p.last,result:p.condition,next:p.next,source:p.source};
+ const confirmed=confirmedInspectionFields(p);
  const rows=inspectionReviewFields.filter(([key])=>key in confirmed).map(([key,label])=>
   '<tr><th scope="row">'+label+'</th><td><small>Подтверждено</small>'+inspectionFieldText(key,confirmed[key])+
   '</td><td><small>На проверке</small>'+inspectionFieldText(key,submission[key])+'</td></tr>').join('');
@@ -518,7 +521,7 @@ function reviewInspection(p){
 }
 function approveInspection(p){
  const x=inspectionPending.get(p.id);if(st.role!=='review'||!x)return;
- inspectionLog.unshift({pkg:p.id,day:x.day,scope:'Наружная поверхность',finding:x.result,action:x.action,source:x.source,submission:{...x},decidedAt:new Date().toISOString()});
+ inspectionLog.unshift({pkg:p.id,day:x.day,scope:'Наружная поверхность',finding:x.result,action:x.action,source:x.source,confirmed:confirmedInspectionFields(p),submission:{...x},decidedAt:new Date().toISOString()});
  p.history.push({v:++p.ver,old:p.notes,now:x.action,why:x.source});
  Object.assign(p,{last:x.day,next:x.next,condition:x.result,source:x.source,notes:x.action});
  inspectionPending.delete(p.id);log(p.id,'Подтверждён повторный осмотр',x.source);$('dlg').close();render();
@@ -638,10 +641,12 @@ function inspectionDecisionCell(entry,expanded=false){
  if(!entry.submission)return esc(entry.source);
  const x=entry.submission;
  const outcome=entry.returnReason?'Возвращено на доработку':'Подтверждено';
+ const baseline=entry.confirmed?'<section class="inspection-baseline"><h4>Подтверждённые сведения на момент решения</h4>'+
+  fact(inspectionReviewFields.filter(([key])=>key in entry.confirmed).map(([key,label])=>[label,inspectionFieldText(key,entry.confirmed[key])]))+'</section>':'';
  const fields=[['Решение',outcome],['Время решения (UTC)',entry.decidedAt.replace('T',' ').slice(0,19)]];
  if(entry.returnReason)fields.push(['Причина возврата',esc(entry.returnReason)]);
  return esc(entry.source)+'<details class="inspection-decision"'+(expanded?' open':'')+'><summary>Редакция '+x.revision+' · '+outcome+'</summary>'+
-  fact(fields)+fact(inspectionReviewFields.map(([key,label])=>[label,inspectionFieldText(key,x[key])]))+inspectionCorrection(x.correction)+'</details>';
+  fact(fields)+baseline+(baseline?'<h4>Сведения, представленные на проверку</h4>':'')+fact(inspectionReviewFields.map(([key,label])=>[label,inspectionFieldText(key,x[key])]))+inspectionCorrection(x.correction)+'</details>';
 }
 function inspectionHistoryFile(p,entries){
  const title='Хронология осмотров упаковки '+esc(p.id);
@@ -823,7 +828,7 @@ function run(act,v,trigger=null){
  if(act==='inspectSubmit')return submitInspection(pk(v));
  if(act==='inspectReview')return reviewInspection(pk(v));
  if(act==='inspectApprove')return approveInspection(pk(v));
- if(act==='inspectReturn'&&st.role==='review'&&inspectionPending.has(v))return form('Возврат записи '+esc(v),[['ireason','Замечание проверяющего']],reason=>{const x=inspectionPending.get(v);inspectionLog.unshift({pkg:v,day:x.day,scope:'Запись возвращена',finding:x.result,action:reason,source:x.source,submission:{...x},returnReason:reason,decidedAt:new Date().toISOString()});returnedInspections.set(v,{...x,reason});inspectionPending.delete(v);log(v,'Запись осмотра возвращена',reason)});
+ if(act==='inspectReturn'&&st.role==='review'&&inspectionPending.has(v))return form('Возврат записи '+esc(v),[['ireason','Замечание проверяющего']],reason=>{const x=inspectionPending.get(v);inspectionLog.unshift({pkg:v,day:x.day,scope:'Запись возвращена',finding:x.result,action:reason,source:x.source,confirmed:confirmedInspectionFields(pk(v)),submission:{...x},returnReason:reason,decidedAt:new Date().toISOString()});returnedInspections.set(v,{...x,reason});inspectionPending.delete(v);log(v,'Запись осмотра возвращена',reason)});
  if(act==='capacity')return capacityCard(v);
  if(act==='capacityCsv'){const r=capacityRecords.find(x=>x.facility===v);if(r)return csv('Task1_capacity_'+v+'.csv',[capacityHeaders,capacityValues(r)]);return}
  if(act==='clearPageFilters'){Object.assign(st,filterDefaults[st.page]||{});render();$('main').querySelector('.filters input,.filters select,#pageJump')?.focus({preventScroll:true});msg('Фильтры сброшены.');return}
