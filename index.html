@@ -97,6 +97,18 @@ button:active:not(:disabled){border-color:var(--ice)}
 .inspection-correction{margin:12px 0 18px;padding:12px;border-left:3px solid #69c6f6;background:#112d43}.inspection-correction h3,.inspection-change h4{margin:0 0 8px}.inspection-change{border-top:1px solid #34516a;padding-top:8px;margin-top:10px}.inspection-change dd{overflow-wrap:anywhere}
 .inspection-decision{min-width:12rem;max-width:32rem}.inspection-decision summary{padding:.4rem 0}.inspection-decision .facts{margin:.65rem 0}.inspection-decision[open]{white-space:normal}
 .inspection-field-error{color:#ffd497;line-height:1.4}.form [aria-invalid="true"]{border-color:#eca956}
+.inspection-caption{display:none}
+@media screen and (max-width:640px){
+ .inspection-list table,.inspection-list tbody{display:block;min-width:0;width:100%}
+ .inspection-list thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .inspection-list tbody{display:grid;gap:.75rem}
+ .inspection-list tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border:1px solid #37566b;border-radius:.6rem;background:#102638;padding:.65rem;gap:.5rem .75rem}
+ .inspection-list td{display:block;min-width:0;padding:0;border:0;overflow-wrap:anywhere}
+ .inspection-list td:first-child,.inspection-list td:last-child{grid-column:1/-1}
+ .inspection-list .inspection-caption{display:block;font-size:.76rem;color:#b6cedd;margin-bottom:.15rem}
+ .inspection-list td button{min-height:44px;max-width:100%;white-space:normal}
+ .inspection-list td:last-child button{width:100%}
+}
 .inspection-empty{padding:1rem;border:1px dashed currentColor;border-radius:.5rem}.inspection-empty p{margin:0}.inspection-empty button{margin-top:.65rem;min-height:44px}
 .inspection-queues{display:flex;gap:.5rem;flex-wrap:wrap;margin:.8rem 0}.inspection-queues button{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:44px;flex:1 1 9rem}.inspection-queues strong{font-variant-numeric:tabular-nums}.inspection-queues [aria-pressed=true]{border-color:#71d5ff;box-shadow:inset 0 -2px #71d5ff}
 </style></head><body><a class="skip-main" href="#main">К содержанию</a><div class="app"><aside class="rail" id="rail"><div class="brand">НЯЦ РК / МНТЦ</div><small>ГИС учёта РАО · Задача 1</small><button class="menu" id="menu" aria-controls="nav" aria-expanded="false">☰ Разделы системы</button><nav id="nav" aria-label="Разделы системы"></nav></aside><div class="work"><header class="mast"><div><strong>Республика Казахстан</strong><div class="sub">Геоинформационная система учёта и контроля РАО</div></div><div class="row"><label>Роль <select id="role"><option value="review">Проверяющий</option><option value="edit">Оператор ввода</option><option value="view">Только просмотр</option></select></label><button id="wall">Режим видеостены</button></div></header><main id="main" tabindex="-1"></main><footer class="foot">НЯЦ РК / МНТЦ · Задача 1 · R3.0 RU · Демонстрационные данные. Внесённые изменения доступны до перезагрузки страницы.</footer></div></div><div class="notif" role="status" id="msg"></div><dialog id="dlg" aria-labelledby="dialogTitle"><div id="modalbody"></div><form method="dialog" class="actions"><button>Закрыть</button></form></dialog><script>
@@ -140,7 +152,7 @@ const num=v=>v==null?'Нет данных':new Intl.NumberFormat('ru-RU',{maximu
 const dt=t=>t?new Date(t).toLocaleString('ru-RU',{timeZone:'UTC',hour12:false})+' UTC':'Не указано';
 const select=(id,label,items,val)=>'<label>'+label+'<select id="'+id+'">'+items.map(x=>{const [v,n]=Array.isArray(x)?x:[x,x];return '<option value="'+esc(v)+'" '+(String(val)===String(v)?'selected':'')+'>'+esc(n)+'</option>'}).join('')+'</select></label>';
 const input=(id,label,val='')=>'<label>'+label+'<input id="'+id+'" value="'+esc(val)+'" autocomplete="off"></label>';
-const tbl=(headers,rows)=>'<div class="scroll"><table><thead><tr>'+headers.map(v=>'<th scope="col">'+v+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(cell=>'<td>'+cell+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><small class="table-help" hidden aria-hidden="true">↔ Прокрутите таблицу по горизонтали</small>'+(rows.length?'':'<p class="empty">Нет записей, соответствующих выбранным условиям.</p>');
+const tbl=(headers,rows,compact=false)=>'<div class="scroll'+(compact?' inspection-list':'')+'"><table><thead><tr>'+headers.map(v=>'<th scope="col">'+v+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map((cell,i)=>'<td>'+(compact?'<span class="inspection-caption" aria-hidden="true">'+headers[i]+'</span>':'')+cell+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><small class="table-help" hidden aria-hidden="true">↔ Прокрутите таблицу по горизонтали</small>'+(rows.length?'':'<p class="empty">Нет записей, соответствующих выбранным условиям.</p>');
 const fact=rows=>'<dl class="facts">'+rows.map(([a,b])=>'<dt>'+a+'</dt><dd>'+b+'</dd>').join('')+'</dl>';
 let pageSections=[];
 function panel(name,html,id='pageSection-'+pageSections.length){
@@ -410,7 +422,7 @@ function controlPanel(){
  const rows=wastePackages.filter(p=>matchesInspectionQueue(p,filter)).sort((a,b)=>(a.next||'9999').localeCompare(b.next||'9999')||a.id.localeCompare(b.id));
  return panel('Контроль повторных осмотров',note('Сроки по карточкам упаковок на 20.11.2026 · учебные данные.')+inspectionQueueShortcuts(filter)+
  filters(select('inspectionTerm','Показать',all(['Просрочен','Назначен на сегодня','Запланирован','Срок не указан','На проверке','На доработке']),filter))+
- (rows.length ? tbl(['Упаковка','Следующий осмотр','Срок','Последний подтверждённый результат','Документ','Действие'],rows.map(p=>[link(p.id,'inspection',p.id),esc(p.next||'—'),inspectionDeadline(p),esc(p.condition),link(esc(p.source),'evidence',p.source),inspectionPending.has(p.id)?btn('Проверить запись','inspectReview',p.id):btn(returnedInspections.has(p.id)?'Исправить запись':'Оформить повторный осмотр','inspectSubmit',p.id,st.role!=='edit')])) : inspectionEmptyState(filter)));
+ (rows.length ? tbl(['Упаковка','Следующий осмотр','Срок','Последний подтверждённый результат','Документ','Действие'],rows.map(p=>[link(p.id,'inspection',p.id),esc(p.next||'—'),inspectionDeadline(p),esc(p.condition),link(esc(p.source),'evidence',p.source),inspectionPending.has(p.id)?btn('Проверить запись','inspectReview',p.id):btn(returnedInspections.has(p.id)?'Исправить запись':'Оформить повторный осмотр','inspectSubmit',p.id,st.role!=='edit')]),true) : inspectionEmptyState(filter)));
 }
 function inspectionDate(value){
  const iso=value.replace(/^(\d{2})\.(\d{2})\.(\d{4})$/,'$3-$2-$1');
