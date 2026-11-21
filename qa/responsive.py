@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function confirmedInspectionFields' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function pageFromAddress' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -391,9 +391,30 @@ with sync_playwright() as p:
         print(name,'HOME',geometry(),flush=True)
         for label,flow in [('map-card-home',map_flow),('stock-filter',metric_flow),('search-navigation',sections_flow)]:
             check(label,flow)
+        page.goto(url+'#packaging')
+        page.locator('#pkgQ').fill('PKG-003')
+        page.locator('#inspectionTerm').select_option('Просрочен')
+        page.reload()
+        assert page.locator('#pkgQ').input_value()=='PKG-003'
+        assert page.locator('#inspectionTerm').input_value()=='Просрочен'
+        page.keyboard.press('Control+k')
+        page.locator('#dlg[open]').wait_for()
+        page.evaluate("location.hash='map'")
+        page.locator('#mapQ').wait_for()
+        assert not page.locator('#dlg').is_visible()
+        page.go_back()
+        assert page.locator('#pkgQ').input_value()=='PKG-003'
+        page.go_forward()
+        assert page.locator('#nav [aria-current]').get_attribute('href')=='#map'
+        page.goto(url+'#unknown-module')
+        page.wait_for_url('**/#overview')
+        assert page.locator('#nav [aria-current]').get_attribute('href')=='#overview'
+        print('RELOAD AND HISTORY',name,'PASS',flush=True)
         for route in routes:
             page.goto(url+'#'+route)
             page.locator('#main h1:visible').first.wait_for()
+            page.reload()
+            assert page.locator('#nav [aria-current]').get_attribute('href')=='#'+route
             g=geometry()
             assert g['width']==w,(name,route,g)
             if route!='overview':
