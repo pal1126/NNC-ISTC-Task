@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function pauseForSeek' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'На карте показано последнее известное положение контейнера.' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -522,6 +522,25 @@ with sync_playwright() as p:
                 assert 'Прибытие. Ожидается приёмка' in page.locator('table strong').inner_text()
                 assert page.locator('[data-act="step"][data-v="1"]').is_disabled()
                 cursor.press('Home')
+                marker=page.locator('.map g').filter(has_text='CT-001')
+                gap=page.get_by_text('Между 00:40 и 02:00 UTC координаты не поступали.',exact=False)
+                activate(page.locator('[data-act="at"][data-v="90"]'))
+                assert gap.is_visible() and cursor.get_attribute('aria-valuetext')=='01:30 UTC'
+                assert marker.locator('title').text_content()=='Последняя отметка: 00:40 UTC'
+                def check_marker(lon,lat):
+                    x,y=marker.locator('circle').last.evaluate("e=>[Number(e.getAttribute('cx')),Number(e.getAttribute('cy'))]")
+                    assert abs(x-(65+(lon-46.49)*770/40.83))<0.01
+                    assert abs(y-(460-(lat-40.55)*420/14.89))<0.01
+                check_marker(57.3,48.1)
+                lines=page.locator('.map > path[stroke="#e5b768"]')
+                previous_lines=lines.evaluate_all("els=>els.map(e=>e.getAttribute('d'))")
+                activate(page.locator('[data-act="step"][data-v="1"]'))
+                assert cursor.get_attribute('aria-valuetext')=='02:00 UTC' and gap.count()==0
+                assert marker.locator('title').text_content()=='Последняя отметка: 02:00 UTC'
+                check_marker(62.2,50.1)
+                assert lines.evaluate_all("els=>els.map(e=>e.getAttribute('d'))")==previous_lines and len(previous_lines)==2
+                cursor.press('Home')
+                print('TRANSPORT MAP GAP',name,'PASS',flush=True)
                 print('TRANSPORT NATIVE DRAG',name,'PASS',positions,flush=True)
                 print('TRANSPORT PLAYBACK FOCUS',name,'PASS',flush=True)
             if route=='national':
