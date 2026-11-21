@@ -120,6 +120,8 @@ button:active:not(:disabled){border-color:var(--ice)}
 }
 .inspection-empty{padding:1rem;border:1px dashed currentColor;border-radius:.5rem}.inspection-empty p{margin:0}.inspection-empty button{margin-top:.65rem;min-height:44px}
 .inspection-queues{display:flex;gap:.5rem;flex-wrap:wrap;margin:.8rem 0}.inspection-queues button{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:44px;flex:1 1 9rem}.inspection-queues strong{font-variant-numeric:tabular-nums}.inspection-queues [aria-pressed=true]{border-color:#71d5ff;box-shadow:inset 0 -2px #71d5ff}
+.dot.zero{background:#9dd9ff;border-radius:0;transform:rotate(45deg)}.dot.missing{background:transparent;border-radius:0;border:2px solid currentColor}.mapkey{flex-wrap:wrap}
+@media print{.mapkey .dot,.atlas-picker .dot{border:1.5px solid #20384c;print-color-adjust:exact}.mapkey{color:#20384c}}
 .print-value,.print-brand{display:none}
 @media print{
  @page{
@@ -255,7 +257,13 @@ const ob=id=>objects.find(o=>o.id===id);
 const chosen=()=>pk(st.pkg);
 const currentTrip=()=>trips[st.trip];
 function xy(lon,lat){return [65+(lon-46.49)/40.83*770,460-(lat-40.55)/14.89*420]}
-function geom(points,selected='',route=[]){const p=points.map(([id,n,x,y])=>{let [cx,cy]=xy(x,y);const place=id.startsWith('S-'),missing=place&&declaration(id).kind==='missing';return '<g '+(id.startsWith('S-')?'data-site="'+id+'" role="button" tabindex="0" aria-pressed="'+(id===selected)+'" aria-label="'+esc(n)+'"':'')+'><title>'+esc(n)+'</title>'+(place?'<circle class="site-hit" cx="'+cx+'" cy="'+cy+'" r="6" fill="transparent"/>':'')+(place&&id===selected?'<circle cx="'+cx+'" cy="'+cy+'" r="14" fill="none" stroke="#ffd58a" stroke-width="3"/>':'')+'<circle cx="'+cx+'" cy="'+cy+'" r="15" fill="'+(id===selected?'#f7bd68':'#51d7c0')+'" opacity=".2"/><circle cx="'+cx+'" cy="'+cy+'" r="6" fill="'+(place?(missing?'#a8b9c9':'#5ee9bb'):(id===selected?'#f7bd68':'#74ebcf'))+'"/><text x="'+(cx+12)+'" y="'+(cy-7)+'" font-size="17" fill="#eff8fb">'+esc(id)+'</text></g>'}).join('');return '<svg class="map" viewBox="0 0 900 495" aria-label="Карта Казахстана с условными объектами"><defs><pattern id="gridmap" width="37" height="37" patternUnits="userSpaceOnUse"><path d="M37 0H0V37" stroke="#245064" fill="none"/></pattern></defs><rect width="900" height="495" fill="url(#gridmap)" opacity=".4"/><path d="'+KZ_PATH+'" class="territory" fill="#184568" stroke="#72cfff" stroke-width="2"/><text x="340" y="290" font-size="27" fill="#6c9eab" letter-spacing="4">КАЗАХСТАН</text>'+route.map(pair=>'<path d="M'+xy(...pair[0]).join(' ')+'L'+xy(...pair[1]).join(' ')+'" stroke="#e5b768" stroke-width="3" fill="none"/>').join('')+p+'</svg>'}
+function siteMarker(kind,x,y){
+ const position='transform="translate('+x+' '+y+')" data-report-kind="'+kind+'"';
+ if(kind==='zero')return '<path '+position+' d="M0 -8L8 0L0 8L-8 0Z" fill="#9dd9ff" stroke="#132d44"/>';
+ if(kind==='missing')return '<rect '+position+' x="-6" y="-6" width="12" height="12" fill="#17384d" stroke="#e5edf3" stroke-width="2"/>';
+ return '<circle '+position+' r="6" fill="#5ee9bb"/>';
+}
+function geom(points,selected='',route=[]){const p=points.map(([id,n,x,y])=>{let [cx,cy]=xy(x,y);const place=id.startsWith('S-'),label=place?n+' · '+declarationText(id):n;return '<g '+(id.startsWith('S-')?'data-site="'+id+'" role="button" tabindex="0" aria-pressed="'+(id===selected)+'" aria-label="'+esc(label)+'"':'')+'><title>'+esc(label)+'</title>'+(place?'<circle class="site-hit" cx="'+cx+'" cy="'+cy+'" r="6" fill="transparent"/>':'')+(place&&id===selected?'<circle cx="'+cx+'" cy="'+cy+'" r="14" fill="none" stroke="#ffd58a" stroke-width="3"/>':'')+'<circle cx="'+cx+'" cy="'+cy+'" r="15" fill="'+(id===selected?'#f7bd68':'#51d7c0')+'" opacity=".2"/>'+(place?siteMarker(declaration(id).kind,cx,cy):'<circle cx="'+cx+'" cy="'+cy+'" r="6" fill="'+(id===selected?'#f7bd68':'#74ebcf')+'"/>')+'<text x="'+(cx+12)+'" y="'+(cy-7)+'" font-size="17" fill="#eff8fb">'+esc(id)+'</text></g>'}).join('');return '<svg class="map" viewBox="0 0 900 495" aria-label="Карта Казахстана с условными объектами"><defs><pattern id="gridmap" width="37" height="37" patternUnits="userSpaceOnUse"><path d="M37 0H0V37" stroke="#245064" fill="none"/></pattern></defs><rect width="900" height="495" fill="url(#gridmap)" opacity=".4"/><path d="'+KZ_PATH+'" class="territory" fill="#184568" stroke="#72cfff" stroke-width="2"/><text x="340" y="290" font-size="27" fill="#6c9eab" letter-spacing="4">КАЗАХСТАН</text>'+route.map(pair=>'<path d="M'+xy(...pair[0]).join(' ')+'L'+xy(...pair[1]).join(' ')+'" stroke="#e5b768" stroke-width="3" fill="none"/>').join('')+p+'</svg>'}
 let priorView=null;
 function captureView(){const {role,uploadName,...view}=st;return {view,wall:document.body.classList.contains('wall'),y:window.scrollY||0}}
 function returnControl(){
@@ -365,7 +373,7 @@ const observationHeaders=['ID','Дата','Пункт','Исходное','Ут�
 function observationDetails(m){
  return modal('Наблюдение '+esc(m.id),fact(observationFields(m).map((value,i)=>[observationHeaders[i],value==null?'—':esc(typeof value==='number'?num(value):value)])));
 }
-function mapLegend(){return '<div class="mapkey"><span><i class="dot reported"></i>Есть отчёт</span><span><i class="dot missing"></i>Нет отчёта</span><span><i class="selectedkey"></i>Выбранная площадка</span></div>'}
+function mapLegend(){return '<div class="mapkey"><span><i class="dot reported"></i>Сведения представлены</span><span><i class="dot zero"></i>Нулевая декларация</span><span><i class="dot missing"></i>Сведения не представлены</span><span><i class="selectedkey"></i>Выбранная площадка</span></div>'}
 function recordSearch(query){
  const normalize=value=>value.normalize('NFKC').toLocaleLowerCase('ru').replaceAll('ё','е').replace(/[‐‑‒–—−]/g,'-').replace(/\s*-\s*/g,'-');
  const words=normalize(query).trim().split(/\s+/).filter(Boolean);
