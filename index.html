@@ -105,6 +105,7 @@ button:active:not(:disabled){border-color:var(--ice)}
  .inspection-review-table th[scope=row]{grid-column:1/-1;border:0;padding-bottom:0}
  .inspection-review-table small{display:block;color:#b6cedd;margin-bottom:.2rem}
 }
+.section-tools{display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-height:44px}.section-tools button{min-height:44px}#sectionKeys{display:block;color:#b6cedd}
 .inspection-caption{display:none}
 @media screen and (max-width:640px){
  .inspection-list table,.inspection-list tbody{display:block;min-width:0;width:100%}
@@ -833,7 +834,7 @@ function run(act,v,trigger=null){
  if(act==='capacityCsv'){const r=capacityRecords.find(x=>x.facility===v);if(r)return csv('Task1_capacity_'+v+'.csv',[capacityHeaders,capacityValues(r)]);return}
  if(act==='clearPageFilters'){Object.assign(st,filterDefaults[st.page]||{});render();$('main').querySelector('.filters input,.filters select,#pageJump')?.focus({preventScroll:true});msg('Фильтры сброшены.');return}
  if(act==='jumpTop'){window.scrollTo(0,0);$('main').focus({preventScroll:true});return}
- if(act==='sections'){modal('Разделы системы','<label class="sectionSearch">Найти раздел или функцию<input id="sectionQuery" type="search" autocomplete="off" placeholder="Название или тема"></label><div id="sectionResults" class="sectionList">'+sectionResults('')+'</div>');$('sectionQuery').oninput=e=>{$('sectionResults').innerHTML=sectionResults(e.target.value)};$('sectionQuery').focus();return}
+ if(act==='sections')return openSectionSearch();
  if(act==='openSection'){$('dlg').close();return nav(+v)}
 
  if(act==='stationOpen'){st.measure=v;st.qc='';st.period='all';return nav(3)}
@@ -1007,6 +1008,21 @@ const searchTopics=['видеостена показатели обзор','ка
 const filterDefaults={
  1:{mapQ:'',mapT:''},2:{objQ:'',objT:''},3:{period:'all',qc:''},5:{fields:''},6:{pkgQ:'',pkgFilter:'',inspectionTerm:''},8:{natSite:'',basis:'',compareDate:'31.10.2025'},10:{research:''},11:{comparePkg:'',nuclide:'',resultKind:''}
 };
+function openSectionSearch(){
+ modal('Разделы системы','<label class="sectionSearch">Найти раздел или функцию<input id="sectionQuery" type="search" autocomplete="off" placeholder="Название или тема" aria-controls="sectionResults" aria-describedby="sectionKeys"></label>'+
+  '<div class="section-tools"><span id="sectionCount" role="status" aria-live="polite" aria-atomic="true"></span><button type="button" id="clearSectionQuery" hidden>Очистить поиск</button></div>'+
+  '<small id="sectionKeys">Стрелки ↑ и ↓ — выбор раздела, Enter — переход, Esc — закрытие окна.</small><div id="sectionResults" class="sectionList"></div>');
+ const input=$('sectionQuery'),results=$('sectionResults'),clear=$('clearSectionQuery');
+ function refresh(){
+  results.innerHTML=sectionResults(input.value);
+  $('sectionCount').textContent='Найдено разделов: '+results.querySelectorAll('button').length;
+  clear.hidden=!input.value;
+ }
+ input.oninput=refresh;
+ clear.onclick=()=>{input.value='';refresh();input.focus()};
+ refresh();
+ input.focus();
+}
 function sectionResults(query){
  const matchesQuery=recordSearch(query);
  const html=groups.map(([title,indexes])=>{
