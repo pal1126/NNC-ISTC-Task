@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'input.oncompositionstart=' in urlopen(url+'?check=wall-fit').read().decode():
+    if "input.addEventListener('compositionstart'" in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -101,7 +101,7 @@ with sync_playwright() as p:
         assert query.evaluate("e=>e===document.activeElement") and page.locator('#dlg').is_visible()
         assert page.locator('#sectionResults button').count()==14
         query.evaluate("e=>e.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}))")
-        assert page.locator('#sectionResults button').count()==1
+        assert page.locator('#sectionResults button').count()==1, page.locator('#sectionResults').inner_text()
         print('SECTION SEARCH COMPOSITION',name,'PASS',flush=True)
         result=page.locator('#sectionResults button').filter(has_text='История перевозок')
         assert result.count()==1
