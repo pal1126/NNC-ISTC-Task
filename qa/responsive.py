@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function exportInventorySelection' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function inventorySelectionNotice' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -464,6 +464,16 @@ with sync_playwright() as p:
                     assert page.locator('#natSite').input_value()=='S-003'
                 page.evaluate("declarations.delete('S-001');render()")
                 page.locator('#natSite').select_option('')
+                empty_site=page.evaluate("sites.find(([id])=>!stock().some(o=>o.site===id) && !declarations.has(id))[0]")
+                page.locator('#natSite').select_option(empty_site)
+                for kind,message in [('missing','Объём РАО неизвестен'),('zero','нулевую декларацию'),('reported','По выбранным условиям')]:
+                    page.evaluate("([id,kind])=>{declarations.set(id,{kind,received:null});render()}",[empty_site,kind])
+                    section=page.locator('#inventory-reconciliation')
+                    assert message in section.inner_text() and section.locator('[data-act="stockCsv"]').is_disabled()
+                page.evaluate("id=>{declarations.delete(id);render()}",empty_site)
+                page.locator('#natSite').select_option('')
+                assert 'Объём РАО неизвестен' not in page.locator('#inventory-reconciliation').inner_text()
+                print('EMPTY INVENTORY SELECTION',name,'PASS',flush=True)
                 import csv
                 from decimal import Decimal
                 reconciliation=page.locator('#inventory-reconciliation')
