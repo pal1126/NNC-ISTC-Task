@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'inventory-reconciliation' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'function exportInventorySelection' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -482,9 +482,24 @@ with sync_playwright() as p:
                         file.seek(0)
                         exported=list(csv.DictReader(file,dialect=dialect))
                     assert [row['ID'] for row in exported]==ids and ids
-                    assert all(row['Основание']==basis for row in exported)
+                    kind='forecast' if basis=='Прогноз' else 'stock'
+                    assert event.value.suggested_filename==f'Task1_RU_inventory_2026-10-31_all-sites_{kind}_demo.csv'
+                    assert all(row['Основание']==basis and row['Выборка по виду сведений']==basis and
+                               row['Отчётная дата']=='31.10.2026' and row['Выборка по площадкам']=='Все площадки' and
+                               row['Статус данных']=='Демонстрационные данные' for row in exported)
                     assert sum(Decimal(row['Заявленный объём, м³'].replace(',','.')) for row in exported)==total
                 page.locator('#basis').select_option('')
+                site=exported[0]['Площадка']
+                page.locator('#natSite').select_option(site)
+                with page.expect_download() as scoped:
+                    activate(reconciliation.locator('[data-act="stockCsv"]'))
+                assert scoped.value.suggested_filename==f'Task1_RU_inventory_2026-10-31_{site}_all_demo.csv'
+                with open(scoped.value.path(),encoding='utf-8-sig',newline='') as file:
+                    scoped_rows=list(csv.DictReader(file,dialect=dialect))
+                assert scoped_rows and all(row['Площадка']==site and row['Выборка по площадкам']==site and
+                                           row['Выборка по виду сведений']=='Все виды сведений' for row in scoped_rows)
+                page.locator('#natSite').select_option('')
+                print('CSV EXPORT CONTEXT',name,'PASS',flush=True)
                 print('NATIONAL VOLUME CSV',name,'PASS',flush=True)
                 print('NATIONAL REPORT TO MAP',name,'PASS',flush=True)
             if route in ['overview','map']:
