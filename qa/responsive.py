@@ -9,7 +9,7 @@ routes = "overview map objects monitor review spec packaging transport national 
 from urllib.request import urlopen
 from time import sleep
 for attempt in range(30):
-    if 'function inspectionEmptyState' in urlopen(url+'?check=wall-fit').read().decode():
+    if 'inspection-caption' in urlopen(url+'?check=wall-fit').read().decode():
         break
     sleep(5)
 else:
@@ -214,6 +214,19 @@ with sync_playwright() as p:
         activate(overdue)
         assert overdue.evaluate('el=>el===document.activeElement')
         opener=page.locator('table [data-act="inspection"][data-v="PKG-004"]')
+        inspection_list=page.locator('.inspection-list')
+        captions=inspection_list.locator('tbody tr').first.locator('.inspection-caption')
+        assert captions.count()==6
+        if name=='phone':
+            assert all(c.is_visible() for c in captions.all())
+            assert inspection_list.evaluate('el=>el.scrollWidth<=el.clientWidth+1')
+            for button in inspection_list.locator('button').all():
+                box=button.bounding_box()
+                assert box and box['height']>=44 and box['x']>=0 and box['x']+box['width']<=w+1
+        else:
+            assert not captions.first.is_visible()
+            assert inspection_list.locator('thead th').first.is_visible()
+        print('INSPECTION ROW LAYOUT',name,'PASS',flush=True)
         opener.scroll_into_view_if_needed()
         top=page.evaluate('scrollY')
         activate(opener)
